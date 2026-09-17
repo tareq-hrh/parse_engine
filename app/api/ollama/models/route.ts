@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getOllamaBaseUrl, isAppConfigError } from "@/lib/env";
 
 export interface OllamaModel {
   name: string;
@@ -9,10 +10,13 @@ export interface OllamaModel {
 
 export async function GET() {
   try {
+    const ollamaBaseUrl = getOllamaBaseUrl();
+
     // ── STEP 1: Get list of installed models ──────────────────────────────────
-    const tagsRes = await fetch(  process.env.OLLAMA_URL + "/api/tags", {
+    const tagsRes = await fetch(`${ollamaBaseUrl}/api/tags`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(5_000),
     });
 
     if (!tagsRes.ok) {
@@ -30,7 +34,7 @@ export async function GET() {
     const models: OllamaModel[] = await Promise.all(
       modelList.map(async (m) => {
         try {
-          const showRes = await fetch( process.env.OLLAMA_URL + "/api/show", {
+          const showRes = await fetch(`${ollamaBaseUrl}/api/show`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ model: m.name }),
@@ -69,7 +73,11 @@ export async function GET() {
     );
 
     return NextResponse.json({ models }, { status: 200 });
-  } catch {
+  } catch (error) {
+    if (isAppConfigError(error)) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     return NextResponse.json(
       {
         error: "Could not connect to Ollama.",

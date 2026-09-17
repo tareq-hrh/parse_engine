@@ -16,78 +16,77 @@ import { callOllamaModel, checkOllamaHealth } from "./ollamaClient";
 import { sanitizeExtractedData } from "./sanitizeExtractedData";
 import { emitExtractionJobEvent } from "./extractionJobEvents";
 import type { ExtractedData } from "@/components/extraction-job/types";
-
-/**
- * In-memory stop flags — keyed by extractionJobId string.
- */
-const stopFlags: Record<string, boolean> = {};
-
-/**
- * In-memory AbortControllers — keyed by extractionJobId string.
- * Used to cancel the in-flight Ollama request immediately on Stop.
- */
-const abortControllers: Record<string, AbortController> = {};
-
-export function requestExtractionJobStop(extractionJobId: string): void {
-  stopFlags[extractionJobId] = true;
-  if (abortControllers[extractionJobId]) {
-    abortControllers[extractionJobId].abort();
-  }
-}
-
-export function clearExtractionJobStopState(extractionJobId: string): void {
-  delete stopFlags[extractionJobId];
-  delete abortControllers[extractionJobId];
-}
-
-export function shouldStopExtractionJob(extractionJobId: string): boolean {
-  return stopFlags[extractionJobId] === true;
-}
+import {
+  claimExtractionJobRun,
+  clearExtractionJobAbortController,
+  releaseExtractionJobRun,
+  setExtractionJobAbortController,
+  shouldStopExtractionJob,
+} from "./extractionJobRuntimeState";
 
 /**
  * Main runner function.
  * Call this from the API route — it runs in the background (no await needed).
  */
 export async function runExtractionJob(extractionJobId: string): Promise<void> {
-  // ── STEP 1: Load Extraction Job ──────────────────────────────────────────────
-  const job = await prisma.extractionJob.findUnique({ where: { id: extractionJobId } });
-  if (!job) {
-    console.error(`❌ Extraction job not found: ${extractionJobId}`);
+  const claimedRun = claimExtractionJobRun(extractionJobId);
+  if (!claimedRun) {
+    console.error(`❌ Another extraction job is already active. Aborting: ${extractionJobId}`);
     return;
   }
 
-  // ── STEP 2: Load Instruction ───────────────────────────────────────────────
-  const instruction = await prisma.instruction.findUnique({ where: { id: job.instructionId } });
-  if (!instruction) {
-    console.error(`❌ Instruction not found for extraction job: ${extractionJobId}`);
-    return;
-  }
-
-  // ── STEP 3: Check Ollama health BEFORE touching the DB ────────────────────
-  const ollamaHealthy = await checkOllamaHealth();
-  if (!ollamaHealthy) {
-    console.error(`❌ Ollama is not reachable. Aborting extraction job: ${extractionJobId}`);
-    throw new Error("OLLAMA_OFFLINE");
-  }
-
-  // ── STEP 4: Mark as running ────────────────────────────────────────────────
-  clearExtractionJobStopState(extractionJobId);
-  await prisma.extractionJob.update({
-    where: { id: extractionJobId },
-    data: {
-      isRunning: true,
-      startedAt: job.startedAt ?? new Date(),
-      finishedAt: null,
-    },
-  });
-
-  // ── STEP 5: Capture previous processing time ───────────────────────────────────
-  const previousProcessingTimeSeconds = job.totalProcessingTimeSeconds;
+  let jobTitle = extractionJobId;
+  let previousProcessingTimeSeconds = 0;
   const sessionStartedAtMs = Date.now();
+  let successfulResultCount = 0;
+  let failedResultCount = 0;
+  let finalized = false;
+
+  try {
+    // ── STEP 1: Load Extraction Job ──────────────────────────────────────────────
+    const job = await prisma.extractionJob.findUnique({ where: { id: extractionJobId } });
+    if (!job) {
+      console.error(`❌ Extraction job not found: ${extractionJobId}`);
+      await stopCrashedExtractionJob(
+        extractionJobId,
+        jobTitle,
+        sessionStartedAtMs,
+        previousProcessingTimeSeconds,
+        successfulResultCount,
+        failedResultCount,
+      );
+      finalized = true;
+      return;
+    }
+    jobTitle = job.title;
+    previousProcessingTimeSeconds = job.totalProcessingTimeSeconds;
+
+    // ── STEP 2: Load Instruction ───────────────────────────────────────────────
+    const instruction = await prisma.instruction.findUnique({ where: { id: job.instructionId } });
+    if (!instruction) {
+      console.error(`❌ Instruction not found for extraction job: ${extractionJobId}`);
+      await stopCrashedExtractionJob(
+        extractionJobId,
+        jobTitle,
+        sessionStartedAtMs,
+        previousProcessingTimeSeconds,
+        successfulResultCount,
+        failedResultCount,
+      );
+      finalized = true;
+      return;
+    }
+
+    // ── STEP 3: Check Ollama health before processing inputs ────────────────────
+    const ollamaHealthy = await checkOllamaHealth();
+    if (!ollamaHealthy) {
+      console.error(`❌ Ollama is not reachable. Aborting extraction job: ${extractionJobId}`);
+      throw new Error("OLLAMA_OFFLINE");
+    }
 
   console.log(`🚀 Starting extraction job: ${job.title} (${extractionJobId})`);
 
-  // ── STEP 6: Load dataset inputs ────────────────────────────────────────────
+  // ── STEP 4: Load dataset inputs ────────────────────────────────────────────
   const datasetInputs = await prisma.datasetInput.findMany({
     where: { datasetId: job.datasetId },
   });
@@ -95,6 +94,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
   if (datasetInputs.length === 0) {
     console.warn("⚠️  No inputs found in the dataset.");
     await finishExtractionJob(job.id, job.title, sessionStartedAtMs, previousProcessingTimeSeconds, 0, 0, "completed");
+    finalized = true;
     return;
   }
 
@@ -106,8 +106,8 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
     where: { extractionJobId, status: "failed" },
   });
 
-  let successfulResultCount = initialSuccessfulResultCount;
-  let failedResultCount = initialFailedResultCount;
+  successfulResultCount = initialSuccessfulResultCount;
+  failedResultCount = initialFailedResultCount;
 
   // ── Emit "started" ─────────────────────────────────────────────────────────
   emitExtractionJobEvent(extractionJobId, { type: "started", totalInputCount: datasetInputs.length });
@@ -124,7 +124,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
     }),
   };
 
-  // ── STEP 7: Process inputs sequentially ───────────────────────────────────
+  // ── STEP 5: Process inputs sequentially ───────────────────────────────────
   for (const input of datasetInputs) {
     // ── Check in-memory stop flag ────────────────────────────────────────────
     if (shouldStopExtractionJob(extractionJobId)) {
@@ -138,6 +138,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
         failedResultCount,
         "stopped",
       );
+      finalized = true;
       return;
     }
 
@@ -154,6 +155,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
         failedResultCount,
         "stopped",
       );
+      finalized = true;
       return;
     }
 
@@ -174,7 +176,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
 
     // ── Create AbortController for this input's Ollama call ──────────────────
     const controller = new AbortController();
-    abortControllers[extractionJobId] = controller;
+    setExtractionJobAbortController(extractionJobId, controller);
 
     const inputStartedAtMs = Date.now();
     console.log(`⚙️  Processing: ${input.label}`);
@@ -195,7 +197,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
 
     // ── Build renderedPrompt ───────────────────────────────────────────────────────
     const renderedPrompt = instruction.prompt.includes("{INPUT_TEXT}")
-      ? instruction.prompt.replace("{INPUT_TEXT}", input.content)
+      ? instruction.prompt.replaceAll("{INPUT_TEXT}", input.content)
       : `${instruction.prompt}\n\n<input_text>\n${input.content}\n</input_text>`;
 
     try {
@@ -274,7 +276,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
 
       // ── Detect abort ───────────────────────────────────────────────────────
       const isAbort =
-        stopFlags[extractionJobId] === true &&
+        shouldStopExtractionJob(extractionJobId) &&
         err instanceof Error &&
         (err.name === "AbortError" || err.name === "TimeoutError");
 
@@ -289,6 +291,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
           failedResultCount,
           "stopped",
         );
+        finalized = true;
         return;
       }
 
@@ -306,6 +309,7 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
           failedResultCount,
           "stopped",
         );
+        finalized = true;
         return;
       }
 
@@ -361,10 +365,12 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
         successfulResultCount,
         failedResultCount,
       });
+    } finally {
+      clearExtractionJobAbortController(extractionJobId, controller);
     }
   }
 
-  // ── STEP 8: All inputs iterated naturally ──────────────────────────────────
+  // ── STEP 6: All inputs iterated naturally ──────────────────────────────────
   await finishExtractionJob(
     job.id,
     job.title,
@@ -374,7 +380,23 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
     failedResultCount,
     "completed",
   );
+  finalized = true;
   console.log(`🎉 Extraction job completed: ${job.title}`);
+  } catch (error) {
+    console.error("❌ Extraction job runner crashed unexpectedly:", error);
+    if (!finalized) {
+      await stopCrashedExtractionJob(
+        extractionJobId,
+        jobTitle,
+        sessionStartedAtMs,
+        previousProcessingTimeSeconds,
+        successfulResultCount,
+        failedResultCount,
+      );
+    }
+  } finally {
+    releaseExtractionJobRun(extractionJobId);
+  }
 }
 
 async function finishExtractionJob(
@@ -398,8 +420,6 @@ async function finishExtractionJob(
     },
   });
 
-  clearExtractionJobStopState(extractionJobId);
-
   emitExtractionJobEvent(extractionJobId, {
     type: reason,
     successfulResultCount,
@@ -408,4 +428,35 @@ async function finishExtractionJob(
   });
 
   console.log(`📌 Extraction job finished (${reason}): ${title}. Total time: ${totalProcessingTimeSeconds}s`);
+}
+
+async function stopCrashedExtractionJob(
+  extractionJobId: string,
+  title: string,
+  sessionStartedAtMs: number,
+  previousProcessingTimeSeconds: number,
+  successfulResultCount: number,
+  failedResultCount: number,
+): Promise<void> {
+  const totalProcessingTimeSeconds =
+    previousProcessingTimeSeconds + Math.round((Date.now() - sessionStartedAtMs) / 1000);
+
+  await prisma.extractionJob.updateMany({
+    where: { id: extractionJobId },
+    data: {
+      isRunning: false,
+      finishedAt: new Date(),
+      currentInputLabel: null,
+      totalProcessingTimeSeconds,
+    },
+  });
+
+  emitExtractionJobEvent(extractionJobId, {
+    type: "stopped",
+    successfulResultCount,
+    failedResultCount,
+    totalProcessingTimeSeconds,
+  });
+
+  console.log(`📌 Extraction job finished (stopped after crash): ${title}. Total time: ${totalProcessingTimeSeconds}s`);
 }

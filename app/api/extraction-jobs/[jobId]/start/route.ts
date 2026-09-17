@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runExtractionJob } from "@/lib/extractionJobRunner";
 import { checkOllamaHealth } from "@/lib/ollamaClient";
+import { isAppConfigError } from "@/lib/env";
+import {
+  claimExtractionJobRun,
+  getActiveExtractionJobId,
+  releaseExtractionJobRun,
+} from "@/lib/extractionJobRuntimeState";
 
 export async function POST(
   _request: Request,
@@ -12,6 +18,17 @@ export async function POST(
 
     if (!jobId?.trim()) {
       return NextResponse.json({ error: "Extraction job ID is required." }, { status: 400 });
+    }
+
+    const activeJobId = getActiveExtractionJobId();
+    if (activeJobId) {
+      return NextResponse.json(
+        {
+          error: "Another extraction job is already active. Stop it before starting a new one.",
+          runningJobId: activeJobId,
+        },
+        { status: 409 },
+      );
     }
 
     const alreadyRunning = await prisma.extractionJob.findFirst({
@@ -42,7 +59,16 @@ export async function POST(
       );
     }
 
-    const ollamaHealthy = await checkOllamaHealth();
+    let ollamaHealthy = false;
+    try {
+      ollamaHealthy = await checkOllamaHealth();
+    } catch (error) {
+      if (isAppConfigError(error)) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      throw error;
+    }
+
     if (!ollamaHealthy) {
       return NextResponse.json(
         { error: "Ollama is not running or cannot be reached. Please start Ollama and try again." },
@@ -50,14 +76,36 @@ export async function POST(
       );
     }
 
-    // Clear finishedAt before returning so the SSE endpoint treats this as an active run.
-    await prisma.extractionJob.update({
-      where: { id: jobId },
-      data: { finishedAt: null },
-    });
+    if (!claimExtractionJobRun(jobId)) {
+      return NextResponse.json(
+        {
+          error: "Another extraction job is already active. Stop it before starting a new one.",
+          runningJobId: getActiveExtractionJobId(),
+        },
+        { status: 409 },
+      );
+    }
+
+    try {
+      // Mark as running before returning so API callers cannot start another job
+      // while the background runner is still initializing.
+      await prisma.extractionJob.update({
+        where: { id: jobId },
+        data: {
+          isRunning: true,
+          startedAt: extractionJob.startedAt ?? new Date(),
+          finishedAt: null,
+          currentInputLabel: null,
+        },
+      });
+    } catch (error) {
+      releaseExtractionJobRun(jobId);
+      throw error;
+    }
 
     runExtractionJob(jobId).catch((error) => {
       console.error("❌ Extraction job runner crashed unexpectedly:", error);
+      releaseExtractionJobRun(jobId);
     });
 
     return NextResponse.json(

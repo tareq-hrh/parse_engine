@@ -17,6 +17,12 @@
 import { Ollama } from "ollama";
 import { fetch as undiciFetch, Agent } from "undici";
 import type { ModelOptions } from "@/components/extraction-job/types";
+import {
+  DEFAULT_OLLAMA_CALL_TIMEOUT_MS,
+  getOllamaBaseUrl,
+  getOllamaCallTimeoutMs,
+  isAppConfigError,
+} from "./env";
 
 /**
  * Custom undici Agent with extended timeouts for Ollama model calls only.
@@ -29,8 +35,8 @@ import type { ModelOptions } from "@/components/extraction-job/types";
  * project continue using Node.js defaults.
  */
 const ollamaAgent = new Agent({
-  headersTimeout: 600_000, // 10 minutes — overrides undici's 5-minute default
-  bodyTimeout: 600_000, // 10 minutes — for large response bodies
+  headersTimeout: DEFAULT_OLLAMA_CALL_TIMEOUT_MS, // 10 minutes — overrides undici's 5-minute default
+  bodyTimeout: DEFAULT_OLLAMA_CALL_TIMEOUT_MS, // 10 minutes — for large response bodies
 });
 
 /**
@@ -41,11 +47,14 @@ const ollamaAgent = new Agent({
  */
 export async function checkOllamaHealth(): Promise<boolean> {
   try {
-    const res = await fetch(process.env.OLLAMA_URL + "/api/tags", {
+    const res = await fetch(`${getOllamaBaseUrl()}/api/tags`, {
       signal: AbortSignal.timeout(5_000), // 5 second health check timeout
     });
     return res.ok;
-  } catch {
+  } catch (error) {
+    if (isAppConfigError(error)) {
+      throw error;
+    }
     return false;
   }
 }
@@ -111,13 +120,11 @@ export async function callOllamaModel(
   signal?: AbortSignal,
 ): Promise<OllamaModelCallResult> {
   // ── STEP 1: Build Ollama instance with custom fetch ───────────────────────
-  const timeoutSignal = AbortSignal.timeout(
-    process.env.OLLAMA_CALL_TIMEOUT ? parseInt(process.env.OLLAMA_CALL_TIMEOUT) : 600_000,
-  ); // 10 minutes
+  const timeoutSignal = AbortSignal.timeout(getOllamaCallTimeoutMs());
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   const ollama = new Ollama({
-    host: process.env.OLLAMA_URL,
+    host: getOllamaBaseUrl(),
     fetch: (url, options) =>
       undiciFetch(url.toString(), {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

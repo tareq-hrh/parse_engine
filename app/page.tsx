@@ -18,7 +18,23 @@ import { ExtractionJob, ExtractionResult } from "@/components/extraction-job/typ
 import type { ExtractionJobEvent } from "@/lib/extractionJobEvents";
 import { Button } from "@/components/shadcn_ui/button";
 import Logo from "@/components/Logo";
-import SupportDev from "@/components/SupportDev";
+
+function dedupeResults(results: ExtractionResult[]): ExtractionResult[] {
+  const seen = new Set<string>();
+  return results.filter((result) => {
+    if (seen.has(result.id)) return false;
+    seen.add(result.id);
+    return true;
+  });
+}
+
+function prependUniqueResult(
+  results: ExtractionResult[],
+  result: ExtractionResult,
+): ExtractionResult[] {
+  if (results.some((existing) => existing.id === result.id)) return results;
+  return [result, ...results];
+}
 
 export default function Home() {
   const [jobs, setJobs] = useState<ExtractionJob[]>([]);
@@ -32,166 +48,228 @@ export default function Home() {
 
   // ── Refs: avoid stale closures inside SSE onmessage handlers ─────────────
   const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
   const viewedJobIdRef = useRef<string | null>(null); // extraction job currently being viewed
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (): Promise<ExtractionJob[]> => {
     try {
       const res = await fetch("/api/extraction-jobs");
       const data = await res.json();
-      setJobs(Array.isArray(data) ? data : []);
+      const nextJobs = Array.isArray(data) ? data : [];
+      setJobs(nextJobs);
+      return nextJobs;
     } catch {
       console.error("Failed to fetch extraction jobs");
+      return [];
     } finally {
       setJobsLoading(false);
+    }
+  }, []);
+
+  const fetchResultsSnapshot = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/extraction-jobs/${id}/results`);
+      const data = await res.json();
+      if (viewedJobIdRef.current !== id) return;
+      setSuccessfulResults(dedupeResults(data.successfulResults ?? []));
+      setFailedResults(dedupeResults(data.failedResults ?? []));
+    } catch {
+      console.error("Failed to fetch extraction results snapshot");
     }
   }, []);
 
   // ── SSE stream management ─────────────────────────────────────────────────
   const openSSEStream = useCallback(
     (jobId: string) => {
+      if (reconnectTimeoutRef.current !== null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+
       // Close any existing stream first
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
 
-      const es = new EventSource(`/api/extraction-jobs/${jobId}/events`);
-      eventSourceRef.current = es;
+      let reconnectAttempt = 0;
 
-      es.onmessage = (e: MessageEvent) => {
-        let event: ExtractionJobEvent;
-        try {
-          event = JSON.parse(e.data as string) as ExtractionJobEvent;
-        } catch {
-          return;
-        }
+      const connect = () => {
+        const es = new EventSource(`/api/extraction-jobs/${jobId}/events`);
+        eventSourceRef.current = es;
 
-        switch (event.type) {
-          case "heartbeat":
-            // Keep-alive ping — no UI action needed
-            break;
+        es.onmessage = (e: MessageEvent) => {
+          let event: ExtractionJobEvent;
+          try {
+            event = JSON.parse(e.data as string) as ExtractionJobEvent;
+          } catch {
+            return;
+          }
 
-          case "started":
-            // Runner confirmed started — mark the job as running in local state
-            setJobs((prev) =>
-              prev.map((job) => (job.id === jobId ? { ...job, isRunning: true } : job)),
-            );
-            break;
+          switch (event.type) {
+            case "heartbeat":
+              // Keep-alive ping — no UI action needed
+              break;
 
-          case "processing":
-            setJobs((prev) =>
-              prev.map((job) =>
-                job.id === jobId
-                  ? {
-                      ...job,
-                      currentInputLabel: event.currentInputLabel,
-                      successfulResultCount: event.successfulResultCount,
-                      failedResultCount: event.failedResultCount,
-                    }
-                  : job,
-              ),
-            );
-            break;
+            case "started":
+              reconnectAttempt = 0;
+              // Runner confirmed started — mark the job as running in local state
+              setJobs((prev) =>
+                prev.map((job) => (job.id === jobId ? { ...job, isRunning: true } : job)),
+              );
+              break;
 
-          case "input_success":
-            setJobs((prev) =>
-              prev.map((job) =>
-                job.id === jobId
-                  ? {
-                      ...job,
-                      successfulResultCount: event.successfulResultCount,
-                      failedResultCount: event.failedResultCount,
-                      lastSuccessfulInputLabel: event.lastSuccessfulInputLabel,
-                      currentInputLabel: null,
-                    }
-                  : job,
-              ),
-            );
-            // Append the result only if the user is viewing this job
-            if (viewedJobIdRef.current === jobId) {
-              setSuccessfulResults((prev) => [event.result as ExtractionResult, ...prev]);
-            }
-            break;
+            case "processing":
+              reconnectAttempt = 0;
+              setJobs((prev) =>
+                prev.map((job) =>
+                  job.id === jobId
+                    ? {
+                        ...job,
+                        currentInputLabel: event.currentInputLabel,
+                        successfulResultCount: event.successfulResultCount,
+                        failedResultCount: event.failedResultCount,
+                      }
+                    : job,
+                ),
+              );
+              break;
 
-          case "input_failed":
-            setJobs((prev) =>
-              prev.map((job) =>
-                job.id === jobId
-                  ? {
-                      ...job,
-                      successfulResultCount: event.successfulResultCount,
-                      failedResultCount: event.failedResultCount,
-                      currentInputLabel: null,
-                    }
-                  : job,
-              ),
-            );
-            if (viewedJobIdRef.current === jobId) {
-              setFailedResults((prev) => [event.result as ExtractionResult, ...prev]);
-            }
-            break;
+            case "input_success":
+              reconnectAttempt = 0;
+              setJobs((prev) =>
+                prev.map((job) =>
+                  job.id === jobId
+                    ? {
+                        ...job,
+                        successfulResultCount: event.successfulResultCount,
+                        failedResultCount: event.failedResultCount,
+                        lastSuccessfulInputLabel: event.lastSuccessfulInputLabel,
+                        currentInputLabel: null,
+                      }
+                    : job,
+                ),
+              );
+              // Append the result only if the user is viewing this job
+              if (viewedJobIdRef.current === jobId) {
+                setSuccessfulResults((prev) =>
+                  prependUniqueResult(prev, event.result as ExtractionResult),
+                );
+              }
+              break;
 
-          case "input_skipped":
-            setJobs((prev) =>
-              prev.map((job) =>
-                job.id === jobId
-                  ? {
-                      ...job,
-                      successfulResultCount: event.successfulResultCount,
-                      failedResultCount: event.failedResultCount,
-                    }
-                  : job,
-              ),
-            );
-            break;
+            case "input_failed":
+              reconnectAttempt = 0;
+              setJobs((prev) =>
+                prev.map((job) =>
+                  job.id === jobId
+                    ? {
+                        ...job,
+                        successfulResultCount: event.successfulResultCount,
+                        failedResultCount: event.failedResultCount,
+                        currentInputLabel: null,
+                      }
+                    : job,
+                ),
+              );
+              if (viewedJobIdRef.current === jobId) {
+                setFailedResults((prev) =>
+                  prependUniqueResult(prev, event.result as ExtractionResult),
+                );
+              }
+              break;
 
-          case "stopped":
-          case "completed":
-            setJobs((prev) =>
-              prev.map((job) =>
-                job.id === jobId
-                  ? {
-                      ...job,
-                      isRunning: false,
-                      currentInputLabel: null,
-                      successfulResultCount: event.successfulResultCount,
-                      failedResultCount: event.failedResultCount,
-                      totalProcessingTimeSeconds: event.totalProcessingTimeSeconds,
-                    }
-                  : job,
-              ),
-            );
-            es.close();
+            case "input_skipped":
+              reconnectAttempt = 0;
+              setJobs((prev) =>
+                prev.map((job) =>
+                  job.id === jobId
+                    ? {
+                        ...job,
+                        successfulResultCount: event.successfulResultCount,
+                        failedResultCount: event.failedResultCount,
+                      }
+                    : job,
+                ),
+              );
+              break;
+
+            case "stopped":
+            case "completed":
+              setJobs((prev) =>
+                prev.map((job) =>
+                  job.id === jobId
+                    ? {
+                        ...job,
+                        isRunning: false,
+                        currentInputLabel: null,
+                        successfulResultCount: event.successfulResultCount,
+                        failedResultCount: event.failedResultCount,
+                        totalProcessingTimeSeconds: event.totalProcessingTimeSeconds,
+                      }
+                    : job,
+                ),
+              );
+              es.close();
+              if (eventSourceRef.current === es) {
+                eventSourceRef.current = null;
+              }
+              if (reconnectTimeoutRef.current !== null) {
+                window.clearTimeout(reconnectTimeoutRef.current);
+                reconnectTimeoutRef.current = null;
+              }
+              // Final sync from DB to pick up any fields we don't track in SSE
+              fetchJobs();
+              if (viewedJobIdRef.current === jobId) {
+                fetchResultsSnapshot(jobId);
+              }
+              break;
+          }
+        };
+
+        es.onerror = () => {
+          es.close();
+          if (eventSourceRef.current === es) {
             eventSourceRef.current = null;
-            // Final sync from DB to pick up any fields we don't track in SSE
-            fetchJobs();
-            break;
-        }
+          }
+
+          reconnectAttempt++;
+          if (reconnectAttempt > 5) {
+            fetchJobs().then((latestJobs) => {
+              const latestJob = latestJobs.find((job) => job.id === jobId);
+              if (!latestJob?.isRunning && viewedJobIdRef.current === jobId) {
+                fetchResultsSnapshot(jobId);
+              }
+            });
+            return;
+          }
+
+          const reconnectDelayMs = Math.min(1_000 * reconnectAttempt, 5_000);
+          reconnectTimeoutRef.current = window.setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+            fetchJobs().then((latestJobs) => {
+              const latestJob = latestJobs.find((job) => job.id === jobId);
+              if (latestJob?.isRunning) {
+                connect();
+              } else if (viewedJobIdRef.current === jobId) {
+                fetchResultsSnapshot(jobId);
+              }
+            });
+          }, reconnectDelayMs);
+        };
       };
 
-      es.onerror = () => {
-        es.close();
-        eventSourceRef.current = null;
-        // Fall back to a DB fetch so the UI doesn't get stuck
-        fetchJobs();
-      };
+      connect();
     },
-    [fetchJobs],
+    [fetchJobs, fetchResultsSnapshot],
   );
   // ── Called when user selects an extraction job to view ───────────────────
   const handleSelectJob = useCallback(async (id: string) => {
     viewedJobIdRef.current = id;
     setSuccessfulResults([]);
     setFailedResults([]);
-    try {
-      const res = await fetch(`/api/extraction-jobs/${id}/results`);
-      const data = await res.json();
-      setSuccessfulResults(data.successfulResults ?? []);
-      setFailedResults(data.failedResults ?? []);
-    } catch {
-      console.error("Failed to fetch extraction results snapshot");
-    }
-  }, []);
+    await fetchResultsSnapshot(id);
+  }, [fetchResultsSnapshot]);
   // ── Initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
     const initFetchJobs = async () => {
@@ -218,6 +296,9 @@ export default function Home() {
   // ── Cleanup SSE stream on unmount ─────────────────────────────────────────
   useEffect(() => {
     return () => {
+      if (reconnectTimeoutRef.current !== null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+      }
       eventSourceRef.current?.close();
     };
   }, []);
@@ -275,7 +356,12 @@ export default function Home() {
           job.id === runningJob.id ? { ...job, isRunning: false, currentInputLabel: null } : job,
         ),
       );
-      fetchJobs();
+      window.setTimeout(() => {
+        fetchJobs();
+        if (viewedJobIdRef.current === runningJob.id) {
+          fetchResultsSnapshot(runningJob.id);
+        }
+      }, 1_500);
     } catch {
       toast.error("Network error. Please try again.");
     } finally {
@@ -297,7 +383,6 @@ export default function Home() {
               Parse Engine
             </span>
           </div>
-          <SupportDev />
         </div>
 
         {ollamaOnline !== null && (

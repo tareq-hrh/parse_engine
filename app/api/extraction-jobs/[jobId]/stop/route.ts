@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requestExtractionJobStop } from "@/lib/extractionJobRunner";
+import {
+  getActiveExtractionJobId,
+  requestExtractionJobStop,
+} from "@/lib/extractionJobRuntimeState";
 
 export async function POST(
   _request: Request,
@@ -18,7 +21,8 @@ export async function POST(
       return NextResponse.json({ error: "Extraction job not found." }, { status: 404 });
     }
 
-    if (!extractionJob.isRunning) {
+    const activeJobId = getActiveExtractionJobId();
+    if (!extractionJob.isRunning && activeJobId !== jobId) {
       return NextResponse.json(
         { error: "Extraction job is not currently running." },
         { status: 400 },
@@ -26,11 +30,6 @@ export async function POST(
     }
 
     requestExtractionJobStop(jobId);
-
-    await prisma.extractionJob.update({
-      where: { id: jobId },
-      data: { isRunning: false },
-    });
 
     return NextResponse.json(
       {

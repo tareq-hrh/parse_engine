@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, Prisma } from "@/lib/prisma";
+import {
+  isApiValidationError,
+  readJsonObject,
+  readOptionalPlainObject,
+  readRequiredTrimmedString,
+} from "@/lib/apiValidation";
 
 export async function GET() {
   try {
@@ -16,34 +22,17 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { title, prompt, outputSchema } = body;
-
-    if (!title?.trim()) {
-      return NextResponse.json({ error: "Instruction title is required." }, { status: 400 });
-    }
-
-    if (!prompt?.trim()) {
-      return NextResponse.json({ error: "Prompt template is required." }, { status: 400 });
-    }
-
-    if (
-      outputSchema !== undefined &&
-      outputSchema !== null &&
-      (typeof outputSchema !== "object" || Array.isArray(outputSchema))
-    ) {
-      return NextResponse.json(
-        { error: "outputSchema must be a JSON object." },
-        { status: 400 },
-      );
-    }
+    const body = await readJsonObject(req);
+    const title = readRequiredTrimmedString(body.title, "Instruction title");
+    const prompt = readRequiredTrimmedString(body.prompt, "Prompt template");
+    const outputSchema = readOptionalPlainObject(body.outputSchema, "outputSchema");
 
     const created = await prisma.instruction.create({
       data: {
-        title: title.trim(),
-        prompt: prompt.trim(),
+        title,
+        prompt,
         outputSchema:
-          outputSchema != null
+          outputSchema !== undefined
             ? (outputSchema as unknown as Prisma.InputJsonObject)
             : Prisma.DbNull,
       },
@@ -51,6 +40,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
+    if (isApiValidationError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error("❌ Failed to create instruction:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }

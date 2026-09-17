@@ -1,3 +1,9 @@
+import type {
+  DuplicateRecord as DatasetInputDuplicateRecord,
+  IngestionMethod,
+  InputIngestionResult as DatasetInputIngestionResult,
+} from "@/lib/datasetInputContracts";
+
 export interface Dataset {
   id: string;
   name: string;
@@ -13,23 +19,15 @@ export interface DatasetInput {
   datasetId: string;
   label: string;
   contentHash: string;
-  ingestionMethod: "file_upload" | "manual_entry" | "api";
+  ingestionMethod: IngestionMethod;
   createdAt: string;
   updatedAt: string;
   // content is excluded from list responses — only fetched individually
 }
 
-export interface DuplicateRecord {
-  submittedLabel: string;
-  existingLabel: string;
-  reason: "duplicate_content" | "duplicate_label";
-}
+export type DuplicateRecord = DatasetInputDuplicateRecord;
 
-export interface InputIngestionResult {
-  added: number;
-  skipped: number;
-  duplicates: DuplicateRecord[];
-}
+export type InputIngestionResult = DatasetInputIngestionResult;
 
 export interface PaginationInfo {
   total: number;

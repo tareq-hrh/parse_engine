@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  isApiValidationError,
+  readBoundedIntegerSearchParam,
+  readJsonObject,
+} from "@/lib/apiValidation";
+import { ingestDatasetInputs } from "@/lib/datasetInputIngestion";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -16,11 +22,11 @@ export async function GET(
     }
 
     const { searchParams } = new URL(req.url);
-    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(searchParams.get("limit") ?? String(DEFAULT_PAGE_SIZE), 10)),
-    );
+    const page = readBoundedIntegerSearchParam(searchParams, "page", 1, { min: 1, max: 10_000 });
+    const limit = readBoundedIntegerSearchParam(searchParams, "limit", DEFAULT_PAGE_SIZE, {
+      min: 1,
+      max: 100,
+    });
     const skip = (page - 1) * limit;
 
     const [inputs, total] = await Promise.all([
@@ -75,12 +81,7 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
-    const body = await req.json();
-    const { inputs } = body;
-
-    if (!Array.isArray(inputs) || inputs.length === 0) {
-      return NextResponse.json({ error: "inputs must be a non-empty array." }, { status: 400 });
-    }
+    const body = await readJsonObject(req);
 
     const dataset = await prisma.dataset.findUnique({ where: { slug } });
     if (!dataset) {
@@ -90,19 +91,18 @@ export async function POST(
       );
     }
 
-    const ingestionResponse = await fetch(new URL("/api/dataset-inputs", req.url).toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        datasetId: dataset.id,
-        ingestionMethod: "api",
-        inputs,
-      }),
+    const result = await ingestDatasetInputs({
+      datasetId: dataset.id,
+      ingestionMethod: "api",
+      inputs: body.inputs,
     });
 
-    const result = await ingestionResponse.json();
-    return NextResponse.json(result, { status: ingestionResponse.status });
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
+    if (isApiValidationError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error("❌ Failed to add inputs through dataset slug:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }

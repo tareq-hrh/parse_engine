@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import slugify from "slugify";
+import {
+  isApiValidationError,
+  readJsonObject,
+  readOptionalTrimmedString,
+  readRequiredTrimmedString,
+} from "@/lib/apiValidation";
+import { generateDatasetSlug } from "@/lib/datasetSlug";
 
 export async function GET() {
   try {
@@ -26,14 +32,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { name, description } = body;
+    const body = await readJsonObject(req);
+    const name = readRequiredTrimmedString(body.name, "Dataset name");
+    const description = readOptionalTrimmedString(body.description, "Dataset description");
 
-    if (!name?.trim()) {
-      return NextResponse.json({ error: "Dataset name is required." }, { status: 400 });
-    }
-
-    const slug = slugify(name.trim(), { lower: true });
+    const slug = generateDatasetSlug(name);
 
     if (!slug) {
       return NextResponse.json(
@@ -45,9 +48,9 @@ export async function POST(req: NextRequest) {
     try {
       const created = await prisma.dataset.create({
         data: {
-          name: name.trim(),
+          name,
           slug,
-          ...(description?.trim() && { description: description.trim() }),
+          ...(description && { description }),
         },
       });
 
@@ -60,13 +63,17 @@ export async function POST(req: NextRequest) {
         (dbError as { code: string }).code === "P2002"
       ) {
         return NextResponse.json(
-          { error: "A dataset with this name already exists." },
+          { error: "A dataset with this name or slug already exists." },
           { status: 409 },
         );
       }
       throw dbError;
     }
   } catch (error) {
+    if (isApiValidationError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error("❌ Failed to create dataset:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }

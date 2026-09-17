@@ -71,11 +71,14 @@ export function ManualInputForm({
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const num = i + 1;
-      if (!row.label.trim()) {
+      const label = row.label.trim();
+      const content = row.content.trim();
+
+      if (!label) {
         toast.error(`Row ${num}: Label is required.`);
         return;
       }
-      if (!row.content.trim()) {
+      if (!content) {
         toast.error(`Row ${num}: Content is required.`);
         return;
       }

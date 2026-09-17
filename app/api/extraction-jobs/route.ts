@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toModelOptions, serializeThink } from "@/lib/prismaHelpers";
+import {
+  isApiValidationError,
+  readJsonObject,
+  readOptionalTrimmedString,
+  readRequiredTrimmedString,
+} from "@/lib/apiValidation";
+import { readModelOptions } from "@/lib/extractionJobContracts";
 
 export async function GET() {
   try {
@@ -46,20 +53,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { title, modelName, instructionId, datasetId, modelOptions } = body;
-
-    if (!modelName?.trim()) {
-      return NextResponse.json({ error: "Ollama model name is required." }, { status: 400 });
-    }
-
-    if (!instructionId?.trim()) {
-      return NextResponse.json({ error: "Instruction ID is required." }, { status: 400 });
-    }
-
-    if (!datasetId?.trim()) {
-      return NextResponse.json({ error: "Dataset ID is required." }, { status: 400 });
-    }
+    const body = await readJsonObject(req);
+    const title = readOptionalTrimmedString(body.title, "Job title");
+    const modelName = readRequiredTrimmedString(body.modelName, "Ollama model name");
+    const instructionId = readRequiredTrimmedString(body.instructionId, "Instruction ID");
+    const datasetId = readRequiredTrimmedString(body.datasetId, "Dataset ID");
+    const modelOptions = readModelOptions(body.modelOptions);
 
     const instruction = await prisma.instruction.findUnique({ where: { id: instructionId } });
     if (!instruction) {
@@ -77,17 +76,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const finalTitle = title?.trim() || `${modelName.trim()} - ${instruction.title}`;
+    const finalTitle = title || `${modelName} - ${instruction.title}`;
 
     const created = await prisma.extractionJob.create({
       data: {
         title: finalTitle,
-        modelName: modelName.trim(),
+        modelName,
         instructionId,
         datasetId,
-        temperature: modelOptions?.temperature ?? 0,
-        numCtx: modelOptions?.num_ctx ?? null,
-        think: serializeThink(modelOptions?.think ?? null),
+        temperature: modelOptions.temperature,
+        numCtx: modelOptions.num_ctx ?? null,
+        think: serializeThink(modelOptions.think ?? null),
       },
       include: {
         instruction: { select: { id: true, title: true, prompt: true, outputSchema: true } },
@@ -118,6 +117,10 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (error) {
+    if (isApiValidationError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error("❌ Failed to create extraction job:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }

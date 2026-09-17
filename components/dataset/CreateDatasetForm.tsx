@@ -8,6 +8,7 @@ import { Label } from "@/components/shadcn_ui/label";
 import { Textarea } from "@/components/shadcn_ui/textarea";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Plus, Loader2, X } from "lucide-react";
+import { generateDatasetSlug } from "@/lib/datasetSlug";
 import { Dataset } from "./types";
 
 export function CreateDatasetForm({
@@ -20,6 +21,7 @@ export function CreateDatasetForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const slugPreview = generateDatasetSlug(name);
 
   async function handleCreate() {
     if (!name.trim()) {
@@ -88,15 +90,7 @@ export function CreateDatasetForm({
             {name.trim() && (
               <p className="font-mono text-[11px] text-muted-foreground">
                 Slug will be:{" "}
-                <span className="text-foreground">
-                  {name
-                    .trim()
-                    .toLowerCase()
-                    .replace(/[^a-z0-9\s-]/g, "")
-                    .replace(/\s+/g, "-")
-                    .replace(/-+/g, "-")
-                    .replace(/^-|-$/g, "")}
-                </span>
+                <span className="text-foreground">{slugPreview || "invalid-name"}</span>
               </p>
             )}
           </div>

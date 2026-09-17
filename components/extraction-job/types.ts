@@ -46,7 +46,7 @@ export type Primitive = string | number | boolean | null;
 export type FlatObject = Record<string, Primitive | Primitive[]>;
 
 // Flexible extraction output — supports scalars, tag lists, and arrays of flat objects (e.g. line items).
-export type ExtractedData = Record<string, Primitive | Primitive[] | FlatObject[]>;
+export type ExtractedData = Record<string, Primitive | Primitive[] | FlatObject | FlatObject[]>;
 
 // Ollama usage metrics stored per extraction result (null for failed results).
 export interface UsageMetrics {

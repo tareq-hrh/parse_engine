@@ -47,6 +47,7 @@ export function ExtractionJobPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<RightPanelMode>("empty");
   const [actionLoading, setActionLoading] = useState(false);
+  const [retryFailedLoading, setRetryFailedLoading] = useState(false);
 
   async function handleSelectJob(id: string) {
     setSelectedId(id);
@@ -91,6 +92,45 @@ export function ExtractionJobPanel({
       toast.error("Network error. Please try again.");
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleRetryFailed() {
+    if (!selectedId) return;
+
+    setRetryFailedLoading(true);
+    try {
+      const res = await fetch(`/api/extraction-jobs/${selectedId}/retry-failed`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Failed to clear failed results.");
+        return;
+      }
+
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === selectedId
+            ? {
+                ...job,
+                successfulResultCount: data.successfulResultCount ?? job.successfulResultCount,
+                failedResultCount: data.failedResultCount ?? 0,
+                totalInputCount: data.totalInputCount ?? job.totalInputCount,
+                isRunning: false,
+                currentInputLabel: null,
+              }
+            : job,
+        ),
+      );
+
+      await onSelectJob(selectedId);
+      toast.success(data.message || "Failed results cleared. Click Start to retry them.");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setRetryFailedLoading(false);
     }
   }
 
@@ -161,6 +201,8 @@ export function ExtractionJobPanel({
             hasRunningJob={hasRunningJob}
             actionLoading={actionLoading}
             onStart={handleStart}
+            retryFailedLoading={retryFailedLoading}
+            onRetryFailed={handleRetryFailed}
           />
         )}
 

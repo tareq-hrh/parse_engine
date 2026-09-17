@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   X,
   Download,
+  RotateCcw,
 } from "lucide-react";
 import { schemaToSimplePreview } from "@/components/instruction/SchemaBuilder";
 import { ExtractionJob, ExtractionResult } from "./types";
@@ -38,6 +39,8 @@ export function ExtractionJobDetails({
   hasRunningJob,
   actionLoading,
   onStart,
+  retryFailedLoading,
+  onRetryFailed,
 }: {
   job: ExtractionJob;
   successfulResults: ExtractionResult[];
@@ -45,6 +48,8 @@ export function ExtractionJobDetails({
   hasRunningJob: boolean;
   actionLoading: boolean;
   onStart: () => void;
+  retryFailedLoading: boolean;
+  onRetryFailed: () => void;
 }) {
   const [activeFilters, setActiveFilters] = useState<FilterState>({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -160,7 +165,7 @@ export function ExtractionJobDetails({
                 <Button
                   size="sm"
                   onClick={onStart}
-                  disabled={actionLoading || hasRunningJob}
+                  disabled={actionLoading || retryFailedLoading || hasRunningJob}
                   className="cursor-pointer rounded-sm uppercase font-mono text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 shrink-0"
                 >
                   {actionLoading ? (
@@ -353,9 +358,35 @@ export function ExtractionJobDetails({
 
           {failedResults.length > 0 && (
             <TabsContent value="failed" className="mt-3">
-              <p className="text-xs text-muted-foreground font-mono mb-3">
-                These inputs failed during extraction. They will be skipped when you start this job again.
-              </p>
+              <div className="mb-3 flex items-start justify-between gap-3 rounded-sm border border-red-500/20 bg-red-500/5 p-3">
+                <div className="space-y-1">
+                  <p className="font-mono text-xs text-foreground">Failed inputs are preserved.</p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    They are skipped by Start until you clear failed results. Successful results stay untouched.
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onRetryFailed}
+                    disabled={retryFailedLoading || actionLoading || job.isRunning || hasRunningJob}
+                    className="rounded-sm font-mono text-xs gap-1.5 shrink-0 border-red-500/30 text-red-400 hover:text-red-300"
+                  >
+                    {retryFailedLoading ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="size-3.5" />
+                    )}
+                    {retryFailedLoading ? "Clearing..." : "Clear failed for retry"}
+                  </Button>
+                  {hasRunningJob && !job.isRunning && (
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      Another job is running
+                    </span>
+                  )}
+                </div>
+              </div>
               <ScrollArea type="auto" className="h-500 pr-3">
                 <div className="space-y-4">
                   {failedResults.map((result) => (

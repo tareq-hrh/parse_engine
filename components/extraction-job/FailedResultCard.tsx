@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { XCircle, Clock, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
+import {
+  fetchDatasetInputContent,
+  getDatasetInputContentErrorMessage,
+} from "@/lib/datasetInputContentClient";
 import { ExtractionResult } from "./types";
 import { formatTime } from "./utils";
 
@@ -10,6 +14,7 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
   const [expanded, setExpanded] = useState(false);
   const [contentExpanded, setContentExpanded] = useState(false);
   const [content, setContent] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
 
   async function handleContentToggle() {
@@ -20,12 +25,11 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
 
     if (content === null) {
       setContentLoading(true);
+      setContentError(null);
       try {
-        const res = await fetch(`/api/dataset-inputs/${result.datasetInputId}`);
-        const data = await res.json();
-        setContent(data.content ?? "");
-      } catch {
-        setContent("Failed to load content.");
+        setContent(await fetchDatasetInputContent(result.datasetInputId));
+      } catch (error) {
+        setContentError(getDatasetInputContentErrorMessage(error));
       } finally {
         setContentLoading(false);
       }
@@ -103,6 +107,12 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
             {content}
           </pre>
         </ScrollArea>
+      )}
+
+      {contentExpanded && contentError && (
+        <div className="rounded-sm border border-destructive/30 bg-destructive/10 p-2 font-mono text-[10px] text-destructive">
+          {contentError}
+        </div>
       )}
     </div>
   );

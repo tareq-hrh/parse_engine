@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { Separator } from "@/components/shadcn_ui/separator";
 import { Clock, Loader2 } from "lucide-react";
+import {
+  fetchDatasetInputContent,
+  getDatasetInputContentErrorMessage,
+} from "@/lib/datasetInputContentClient";
 import { ExtractionResult, Primitive, FlatObject } from "./types";
 import { formatTime } from "./utils";
 import { ScrollArea } from "../shadcn_ui/scroll-area";
@@ -136,6 +140,7 @@ function FlatObjectTable({ rows }: { rows: FlatObject[] }) {
 export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
   const [expanded, setExpanded] = useState(false);
   const [content, setContent] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleToggle() {
@@ -146,12 +151,11 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
 
     if (content === null) {
       setLoading(true);
+      setContentError(null);
       try {
-        const res = await fetch(`/api/dataset-inputs/${result.datasetInputId}`);
-        const data = await res.json();
-        setContent(data.content ?? "");
-      } catch {
-        setContent("Failed to load content.");
+        setContent(await fetchDatasetInputContent(result.datasetInputId));
+      } catch (error) {
+        setContentError(getDatasetInputContentErrorMessage(error));
       } finally {
         setLoading(false);
       }
@@ -276,6 +280,12 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
             {content}
           </pre>
         </ScrollArea>
+      )}
+
+      {expanded && contentError && (
+        <div className="rounded-sm border border-destructive/30 bg-destructive/10 p-2 font-mono text-[10px] text-destructive">
+          {contentError}
+        </div>
       )}
     </div>
   );

@@ -83,9 +83,11 @@ describe("schemaUtils", () => {
               price: { type: "number" },
               tags: { type: "array", items: { type: "string" } },
             },
+            additionalProperties: false,
           },
         },
       },
+      additionalProperties: false,
     });
   });
 

@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import {
+  fetchDatasetInputContent,
+  getDatasetInputContentErrorMessage,
+} from "@/lib/datasetInputContentClient";
 import { DatasetInput } from "./types";
 import { ScrollArea } from "../shadcn_ui/scroll-area";
 
 export function InputCard({ input }: { input: DatasetInput }) {
   const [expanded, setExpanded] = useState(false);
   const [content, setContent] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleToggle() {
@@ -19,12 +24,11 @@ export function InputCard({ input }: { input: DatasetInput }) {
     // Fetch content on first expand
     if (content === null) {
       setLoading(true);
+      setContentError(null);
       try {
-        const res = await fetch(`/api/dataset-inputs/${input.id}`);
-        const data = await res.json();
-        setContent(data.content ?? "");
-      } catch {
-        setContent("Failed to load content.");
+        setContent(await fetchDatasetInputContent(input.id));
+      } catch (error) {
+        setContentError(getDatasetInputContentErrorMessage(error));
       } finally {
         setLoading(false);
       }
@@ -68,6 +72,12 @@ export function InputCard({ input }: { input: DatasetInput }) {
         <ScrollArea className="h-48 overflow-y-auto font-mono text-[10px] text-foreground bg-muted/30 border border-border rounded-sm p-2 whitespace-pre-wrap break-all">
           {content}
         </ScrollArea>
+      )}
+
+      {expanded && contentError && (
+        <div className="rounded-sm border border-destructive/30 bg-destructive/10 p-2 font-mono text-[10px] text-destructive">
+          {contentError}
+        </div>
       )}
     </div>
   );

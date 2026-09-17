@@ -104,7 +104,11 @@ export function buildOutputSchema(fields: SchemaField[]): Record<string, unknown
       if (Object.keys(subProperties).length === 0) continue;
       properties[name] = {
         type: "array",
-        items: { type: "object", properties: subProperties },
+        items: {
+          type: "object",
+          properties: subProperties,
+          additionalProperties: false,
+        },
       };
     } else {
       properties[name] = subFieldTypeToSchema(field.type);
@@ -112,7 +116,7 @@ export function buildOutputSchema(fields: SchemaField[]): Record<string, unknown
   }
 
   if (Object.keys(properties).length === 0) return null;
-  return { type: "object", properties };
+  return { type: "object", properties, additionalProperties: false };
 }
 
 export function buildSchemaPreview(fields: SchemaField[]): Record<string, unknown> | null {

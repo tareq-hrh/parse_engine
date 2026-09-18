@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Plus, Loader2 } from "lucide-react";
@@ -24,6 +25,7 @@ export function InstructionPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<RightPanelMode>("empty");
   const [loading, setLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchInstructions = useCallback(async () => {
     try {
@@ -62,6 +64,35 @@ export function InstructionPanel() {
     setInstructions((prev) => [newInstruction, ...prev]);
     setSelectedId(newInstruction.id);
     setMode("view");
+  }
+
+  async function handleDeleteInstruction(): Promise<boolean> {
+    if (!selectedId) return false;
+
+    const instructionId = selectedId;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/instructions/${instructionId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete instruction.");
+        return false;
+      }
+
+      setInstructions((prev) => prev.filter((instruction) => instruction.id !== instructionId));
+      setSelectedId(null);
+      setMode("empty");
+      toast.success(data.message || "Instruction deleted.");
+      return true;
+    } catch {
+      toast.error("Network error. Please try again.");
+      return false;
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   const selectedInstruction = instructions.find((instruction) => instruction.id === selectedId) ?? null;
@@ -117,7 +148,11 @@ export function InstructionPanel() {
       <div className="flex-1 border border-border rounded-sm bg-card flex flex-col overflow-hidden min-w-0">
         {mode === "empty" && <EmptyState />}
         {mode === "view" && selectedInstruction && (
-          <ViewInstruction instruction={selectedInstruction} />
+          <ViewInstruction
+            instruction={selectedInstruction}
+            deleteLoading={deleteLoading}
+            onDeleteInstruction={handleDeleteInstruction}
+          />
         )}
         {mode === "create" && (
           <CreateInstructionForm onCreated={handleCreated} onCancel={handleCancelCreate} />

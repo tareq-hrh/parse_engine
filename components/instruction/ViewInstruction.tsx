@@ -1,22 +1,132 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/shadcn_ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn_ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/shadcn_ui/dropdown-menu";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
+import { Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import { schemaToSimplePreview } from "./SchemaBuilder";
 import { Instruction } from "./types";
 
-export function ViewInstruction({ instruction }: { instruction: Instruction }) {
+interface ViewInstructionProps {
+  instruction: Instruction;
+  deleteLoading: boolean;
+  onDeleteInstruction: () => Promise<boolean>;
+}
+
+export function ViewInstruction({
+  instruction,
+  deleteLoading,
+  onDeleteInstruction,
+}: ViewInstructionProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  async function handleConfirmDelete() {
+    const deleted = await onDeleteInstruction();
+    if (deleted) {
+      setDeleteDialogOpen(false);
+    }
+  }
+
   return (
     <>
-      <div className="px-3 py-5 border-b border-border shrink-0">
-        <h2 className="font-mono text-base font-semibold text-foreground">{instruction.title}</h2>
-        <p className="text-xs text-muted-foreground font-mono mt-1">
-          Created:{" "}
-          {new Date(instruction.createdAt).toLocaleString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
+      <div className="px-3 py-5 border-b border-border shrink-0 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-mono text-base font-semibold text-foreground wrap-break-word">
+            {instruction.title}
+          </h2>
+          <p className="text-xs text-muted-foreground font-mono mt-1">
+            Created:{" "}
+            {new Date(instruction.createdAt).toLocaleString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+        <Dialog
+          open={deleteDialogOpen}
+          onOpenChange={(open) => {
+            if (!deleteLoading) setDeleteDialogOpen(open);
+          }}
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon-sm"
+                variant="outline"
+                disabled={deleteLoading}
+                className="rounded-sm text-muted-foreground hover:text-foreground shrink-0"
+                aria-label="Open instruction actions"
+              >
+                {deleteLoading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="size-3.5" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={deleteLoading}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setDeleteDialogOpen(true);
+                }}
+                className="font-mono text-xs"
+              >
+                <Trash2 className="size-3.5" />
+                Delete instruction
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DialogContent className="font-mono">
+            <DialogHeader>
+              <DialogTitle>Delete instruction?</DialogTitle>
+              <DialogDescription>
+                This deletes the instruction only. Instructions used by extraction jobs must have
+                those jobs deleted first.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs">
+              <div className="text-muted-foreground uppercase tracking-wider">Instruction</div>
+              <div className="mt-1 text-foreground wrap-break-word">{instruction.title}</div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline" disabled={deleteLoading} className="font-mono text-xs">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={deleteLoading}
+                onClick={handleConfirmDelete}
+                className="font-mono text-xs gap-1.5"
+              >
+                {deleteLoading && <Loader2 className="size-3.5 animate-spin" />}
+                Delete instruction
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <ScrollArea className="flex-1 p-5">

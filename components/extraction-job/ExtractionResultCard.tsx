@@ -10,6 +10,7 @@ import {
 import { ExtractionResult, Primitive, FlatObject } from "./types";
 import { formatTime } from "./utils";
 import { ScrollArea } from "../shadcn_ui/scroll-area";
+import { UsageMetricsDisclosure } from "./UsageMetricsDisclosure";
 
 // ── Type guards ────────────────────────────────────────────────────────────────
 
@@ -272,6 +273,8 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
           )}
         </button>
       </div>
+
+      <UsageMetricsDisclosure metrics={result.usageMetrics} />
 
       {/* ── Raw content window ───────────────────────────────────────────── */}
       {expanded && content !== null && (

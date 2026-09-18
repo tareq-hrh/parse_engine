@@ -9,6 +9,7 @@ import {
 } from "@/lib/datasetInputContentClient";
 import { ExtractionResult } from "./types";
 import { formatTime } from "./utils";
+import { UsageMetricsDisclosure } from "./UsageMetricsDisclosure";
 
 export function FailedResultCard({ result }: { result: ExtractionResult }) {
   const [expanded, setExpanded] = useState(false);
@@ -86,6 +87,8 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
           {formatTime(result.processingDurationSeconds)}
         </span>
       </div>
+
+      <UsageMetricsDisclosure metrics={result.usageMetrics} />
 
       {expanded && result.errorMessage && (
         <ScrollArea className="h-48 rounded border border-red-500/30 bg-red-500/20">

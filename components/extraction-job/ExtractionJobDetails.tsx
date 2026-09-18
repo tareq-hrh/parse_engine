@@ -6,6 +6,21 @@ import { Separator } from "@/components/shadcn_ui/separator";
 import { Button } from "@/components/shadcn_ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn_ui/tabs";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn_ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/shadcn_ui/dropdown-menu";
+import {
   Clock,
   CheckCircle2,
   XCircle,
@@ -17,6 +32,8 @@ import {
   X,
   Download,
   RotateCcw,
+  Trash2,
+  MoreHorizontal,
 } from "lucide-react";
 import { schemaToSimplePreview } from "@/components/instruction/SchemaBuilder";
 import { ExtractionJob, ExtractionResult } from "./types";
@@ -41,6 +58,8 @@ export function ExtractionJobDetails({
   onStart,
   retryFailedLoading,
   onRetryFailed,
+  deleteLoading,
+  onDeleteJob,
 }: {
   job: ExtractionJob;
   successfulResults: ExtractionResult[];
@@ -50,14 +69,18 @@ export function ExtractionJobDetails({
   onStart: () => void;
   retryFailedLoading: boolean;
   onRetryFailed: () => void;
+  deleteLoading: boolean;
+  onDeleteJob: () => Promise<boolean>;
 }) {
   const [activeFilters, setActiveFilters] = useState<FilterState>({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const instructionTitle = job.instruction.title;
   const datasetName = job.dataset.name;
   const status = getJobStatus(job);
   const total = job.totalInputCount;
+  const deleteDisabled = deleteLoading || actionLoading || retryFailedLoading || hasRunningJob;
 
   const successPercent =
     total > 0 ? Math.min(100, Math.round((job.successfulResultCount / total) * 100)) : 0;
@@ -102,6 +125,13 @@ export function ExtractionJobDetails({
     a.download = `${job.title}-results.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleConfirmDelete() {
+    const deleted = await onDeleteJob();
+    if (deleted) {
+      setDeleteDialogOpen(false);
+    }
   }
 
   return (
@@ -182,6 +212,77 @@ export function ExtractionJobDetails({
                 )}
               </div>
             )}
+
+            <Dialog
+              open={deleteDialogOpen}
+              onOpenChange={(open) => {
+                if (!deleteLoading) setDeleteDialogOpen(open);
+              }}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    disabled={deleteLoading}
+                    className="rounded-sm text-muted-foreground hover:text-foreground"
+                    aria-label="Open job actions"
+                  >
+                    {deleteLoading ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <MoreHorizontal className="size-3.5" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={deleteDisabled}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setDeleteDialogOpen(true);
+                    }}
+                    className="font-mono text-xs"
+                  >
+                    <Trash2 className="size-3.5" />
+                    Delete job
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DialogContent className="font-mono">
+                <DialogHeader>
+                  <DialogTitle>Delete extraction job?</DialogTitle>
+                  <DialogDescription>
+                    This deletes the job and all of its extraction results. The dataset inputs and
+                    instruction stay untouched.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs">
+                  <div className="text-muted-foreground uppercase tracking-wider">Job</div>
+                  <div className="mt-1 text-foreground wrap-break-word">{job.title}</div>
+                  <div className="mt-3 text-muted-foreground">
+                    Results to remove: {job.successfulResultCount + job.failedResultCount}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline" disabled={deleteLoading} className="font-mono text-xs">
+                      Cancel
+                    </Button>
+                  </DialogClose>
+                  <Button
+                    variant="destructive"
+                    disabled={deleteLoading}
+                    onClick={handleConfirmDelete}
+                    className="font-mono text-xs gap-1.5"
+                  >
+                    {deleteLoading && <Loader2 className="size-3.5 animate-spin" />}
+                    Delete job
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 

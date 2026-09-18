@@ -270,6 +270,14 @@ export default function Home() {
     setFailedResults([]);
     await fetchResultsSnapshot(id);
   }, [fetchResultsSnapshot]);
+
+  const handleDeletedJob = useCallback((id: string) => {
+    if (viewedJobIdRef.current === id) {
+      viewedJobIdRef.current = null;
+    }
+    setSuccessfulResults([]);
+    setFailedResults([]);
+  }, []);
   // ── Initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
     const initFetchJobs = async () => {
@@ -472,6 +480,7 @@ export default function Home() {
               failedResults={failedResults}
               onSelectJob={handleSelectJob}
               onStarted={handleStarted}
+              onDeletedJob={handleDeletedJob}
             />
           </TabsContent>
 

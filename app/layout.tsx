@@ -31,7 +31,7 @@ export default function RootLayout({
     <html lang="en" className={`${roboto.variable} ${robotoMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
-          <ToastContainer position="bottom-right" theme="colored"/>
+          <ToastContainer position="bottom-right" theme="light"/>
           {children}
           <ThemeToggle />
         </ThemeProvider>

@@ -31,6 +31,7 @@ interface ExtractionJobPanelProps {
   // Callbacks to parent
   onSelectJob: (id: string) => Promise<void>; // triggers snapshot fetch + viewedJobId tracking
   onStarted: (jobId: string) => void;         // triggers SSE stream open after successful start
+  onDeletedJob: (id: string) => void;
 }
 
 // ── Main ExtractionJobPanel ─────────────────────────────────────────────────────
@@ -43,11 +44,13 @@ export function ExtractionJobPanel({
   failedResults,
   onSelectJob,
   onStarted,
+  onDeletedJob,
 }: ExtractionJobPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<RightPanelMode>("empty");
   const [actionLoading, setActionLoading] = useState(false);
   const [retryFailedLoading, setRetryFailedLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   async function handleSelectJob(id: string) {
     setSelectedId(id);
@@ -134,6 +137,36 @@ export function ExtractionJobPanel({
     }
   }
 
+  async function handleDeleteJob(): Promise<boolean> {
+    if (!selectedId) return false;
+
+    const jobId = selectedId;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/extraction-jobs/${jobId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete extraction job.");
+        return false;
+      }
+
+      setJobs((prev) => prev.filter((job) => job.id !== jobId));
+      onDeletedJob(jobId);
+      setSelectedId(null);
+      setMode("empty");
+      toast.success(data.message || "Extraction job deleted.");
+      return true;
+    } catch {
+      toast.error("Network error. Please try again.");
+      return false;
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   const selectedJob = jobs.find((job) => job.id === selectedId) ?? null;
 
   // ── Sort: running job always first, preserve original order for the rest ──
@@ -203,6 +236,8 @@ export function ExtractionJobPanel({
             onStart={handleStart}
             retryFailedLoading={retryFailedLoading}
             onRetryFailed={handleRetryFailed}
+            deleteLoading={deleteLoading}
+            onDeleteJob={handleDeleteJob}
           />
         )}
 

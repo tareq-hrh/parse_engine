@@ -84,7 +84,8 @@ export function ExtractionJobDetails({
 
   const successPercent =
     total > 0 ? Math.min(100, Math.round((job.successfulResultCount / total) * 100)) : 0;
-  const failurePercent = total > 0 ? Math.min(100, Math.round((job.failedResultCount / total) * 100)) : 0;
+  const failurePercent =
+    total > 0 ? Math.min(100, Math.round((job.failedResultCount / total) * 100)) : 0;
 
   // ── Facets — recomputed each time successfulResults updates (each poll) ─────────
   const facets = useMemo(() => computeFacets(successfulResults), [successfulResults]);
@@ -138,151 +139,155 @@ export function ExtractionJobDetails({
     <ScrollArea className="flex-1">
       <div className="px-3 py-5 space-y-5">
         {/* ── Header row ──────────────────────────────────────────────── */}
-        <div className="flex gap-2 items-start justify-between">
-          {/* ── Left: extraction job info ─────────────────────────────────────────── */}
-          <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <h2 className="font-mono text-base font-semibold text-foreground">{job.title}</h2>
-              <StatusBadge status={status} />
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground font-mono mb-1">
-              <span>
-                Model: <span className="text-foreground">{job.modelName}</span>
-              </span>
-              <span>
-                Instruction: <span className="text-foreground">{instructionTitle}</span>
-              </span>
-              <span>
-                Dataset: <span className="text-foreground">{datasetName}</span>
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground font-mono">
-              <ModelOptionsDisplay options={job.modelOptions} />
-            </div>
-          </div>
-
-          {/* ── Right: Stats + Start button ───────────────────────────── */}
-          <div className="flex items-center gap-6 pr-3 shrink-0">
-            {/* Stats */}
-            <div className="flex gap-8">
-              <div className="space-y-0.5">
-                <p className="font-mono text-sm text-muted-foreground uppercase tracking-wider">
-                  Started
-                </p>
-                <p className="font-mono text-sm text-foreground">
-                  {job.startedAt
-                    ? new Date(job.startedAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "—"}
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <p className="font-mono text-sm text-muted-foreground uppercase tracking-wider">
-                  Total Time
-                </p>
-                <p className="font-mono text-sm text-foreground flex items-center gap-1">
-                  <Clock className="size-4 text-blue-400" />
-                  {formatTime(job.totalProcessingTimeSeconds)}
-                </p>
-              </div>
-            </div>
-
-            {/* Start button — only for pending jobs */}
-            {status === "pending" && (
-              <div className="flex flex-col items-end gap-1">
-                <Button
-                  size="sm"
-                  onClick={onStart}
-                  disabled={actionLoading || retryFailedLoading || hasRunningJob}
-                  className="cursor-pointer rounded-sm uppercase font-mono text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 shrink-0"
-                >
-                  {actionLoading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Play className="size-4 fill-white" />
-                  )}
-                  {actionLoading ? "Starting..." : "Start"}
-                </Button>
-                {hasRunningJob && !job.isRunning && (
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    Another job is running
-                  </span>
+        <div>
+          {/* Start button — only for pending jobs */}
+          {status === "pending" && (
+            <div className="flex flex-col items-start gap-1 mb-2">
+              <Button
+                size="sm"
+                onClick={onStart}
+                disabled={actionLoading || retryFailedLoading || hasRunningJob}
+                className="cursor-pointer rounded-sm uppercase font-mono text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 shrink-0"
+              >
+                {actionLoading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Play className="size-4 fill-white" />
                 )}
+                {actionLoading ? "Starting..." : "Start"}
+              </Button>
+              {hasRunningJob && !job.isRunning && (
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  Another job is running
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2 items-start justify-between">
+            {/* ── Left: extraction job info ─────────────────────────────────────────── */}
+            <div>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h2 className="font-mono text-base font-semibold text-foreground">{job.title}</h2>
+                <StatusBadge status={status} />
               </div>
-            )}
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground font-mono mb-1">
+                <span>
+                  Model: <span className="text-foreground">{job.modelName}</span>
+                </span>
+                <span>
+                  Instruction: <span className="text-foreground">{instructionTitle}</span>
+                </span>
+                <span>
+                  Dataset: <span className="text-foreground">{datasetName}</span>
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground font-mono">
+                <ModelOptionsDisplay options={job.modelOptions} />
+              </div>
+            </div>
 
-            <Dialog
-              open={deleteDialogOpen}
-              onOpenChange={(open) => {
-                if (!deleteLoading) setDeleteDialogOpen(open);
-              }}
-            >
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="icon-sm"
-                    variant="outline"
-                    disabled={deleteLoading}
-                    className="rounded-sm text-muted-foreground hover:text-foreground"
-                    aria-label="Open job actions"
-                  >
-                    {deleteLoading ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <MoreHorizontal className="size-3.5" />
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem
-                    variant="destructive"
-                    disabled={deleteDisabled}
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      setDeleteDialogOpen(true);
-                    }}
-                    className="font-mono text-xs"
-                  >
-                    <Trash2 className="size-3.5" />
-                    Delete job
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <DialogContent className="font-mono">
-                <DialogHeader>
-                  <DialogTitle>Delete extraction job?</DialogTitle>
-                  <DialogDescription>
-                    This deletes the job and all of its extraction results. The dataset inputs and
-                    instruction stay untouched.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs">
-                  <div className="text-muted-foreground uppercase tracking-wider">Job</div>
-                  <div className="mt-1 text-foreground wrap-break-word">{job.title}</div>
-                  <div className="mt-3 text-muted-foreground">
-                    Results to remove: {job.successfulResultCount + job.failedResultCount}
-                  </div>
+            {/* ── Right: Stats + Start button ───────────────────────────── */}
+            <div className="flex items-center gap-6 pr-3 shrink-0">
+              {/* Stats */}
+              <div className="flex gap-8">
+                <div className="space-y-0.5">
+                  <p className="font-mono text-sm text-muted-foreground uppercase tracking-wider">
+                    Started
+                  </p>
+                  <p className="font-mono text-sm text-foreground">
+                    {job.startedAt
+                      ? new Date(job.startedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : "—"}
+                  </p>
                 </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline" disabled={deleteLoading} className="font-mono text-xs">
-                      Cancel
+                <div className="space-y-0.5">
+                  <p className="font-mono text-sm text-muted-foreground uppercase tracking-wider">
+                    Total Time
+                  </p>
+                  <p className="font-mono text-sm text-foreground flex items-center gap-1">
+                    <Clock className="size-4 text-blue-400" />
+                    {formatTime(job.totalProcessingTimeSeconds)}
+                  </p>
+                </div>
+              </div>
+              <Dialog
+                open={deleteDialogOpen}
+                onOpenChange={(open) => {
+                  if (!deleteLoading) setDeleteDialogOpen(open);
+                }}
+              >
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="outline"
+                      disabled={deleteLoading}
+                      className="rounded-sm text-muted-foreground hover:text-foreground"
+                      aria-label="Open job actions"
+                    >
+                      {deleteLoading ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <MoreHorizontal className="size-3.5" />
+                      )}
                     </Button>
-                  </DialogClose>
-                  <Button
-                    variant="destructive"
-                    disabled={deleteLoading}
-                    onClick={handleConfirmDelete}
-                    className="font-mono text-xs gap-1.5"
-                  >
-                    {deleteLoading && <Loader2 className="size-3.5 animate-spin" />}
-                    Delete job
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={deleteDisabled}
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="font-mono text-xs"
+                    >
+                      <Trash2 className="size-3.5" />
+                      Delete job
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DialogContent className="font-mono">
+                  <DialogHeader>
+                    <DialogTitle>Delete extraction job?</DialogTitle>
+                    <DialogDescription>
+                      This deletes the job and all of its extraction results. The dataset inputs and
+                      instruction stay untouched.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs">
+                    <div className="text-muted-foreground uppercase tracking-wider">Job</div>
+                    <div className="mt-1 text-foreground wrap-break-word">{job.title}</div>
+                    <div className="mt-3 text-muted-foreground">
+                      Results to remove: {job.successfulResultCount + job.failedResultCount}
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button
+                        variant="outline"
+                        disabled={deleteLoading}
+                        className="font-mono text-xs"
+                      >
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      variant="destructive"
+                      disabled={deleteLoading}
+                      onClick={handleConfirmDelete}
+                      className="font-mono text-xs gap-1.5"
+                    >
+                      {deleteLoading && <Loader2 className="size-3.5 animate-spin" />}
+                      Delete job
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
 
@@ -329,7 +334,8 @@ export function ExtractionJobDetails({
           )}
           {job.lastSuccessfulInputLabel && (
             <p className="text-xs font-mono text-muted-foreground truncate">
-              Last successful input: <span className="text-foreground">{job.lastSuccessfulInputLabel}</span>
+              Last successful input:{" "}
+              <span className="text-foreground">{job.lastSuccessfulInputLabel}</span>
             </p>
           )}
         </div>
@@ -362,9 +368,7 @@ export function ExtractionJobDetails({
 
           <TabsContent value="results" className="mt-3">
             {successfulResults.length === 0 ? (
-              <p className="text-xs text-muted-foreground font-mono">
-                No results yet.
-              </p>
+              <p className="text-xs text-muted-foreground font-mono">No results yet.</p>
             ) : (
               <>
                 {/* ── Filter controls row ─────────────────────────────── */}
@@ -445,13 +449,13 @@ export function ExtractionJobDetails({
                     No results match the current filters.
                   </p>
                 ) : (
-                    <ScrollArea type="auto" className="h-500 pr-3">
-                      <div className="space-y-4">
-                        {filteredSuccessfulResults.map((result) => (
-                          <ExtractionResultCard key={result.id} result={result} />
-                        ))}
-                      </div>
-                    </ScrollArea>
+                  <ScrollArea type="auto" className="h-500 pr-3">
+                    <div className="space-y-4">
+                      {filteredSuccessfulResults.map((result) => (
+                        <ExtractionResultCard key={result.id} result={result} />
+                      ))}
+                    </div>
+                  </ScrollArea>
                 )}
               </>
             )}
@@ -463,7 +467,8 @@ export function ExtractionJobDetails({
                 <div className="space-y-1">
                   <p className="font-mono text-xs text-foreground">Failed inputs are preserved.</p>
                   <p className="text-xs text-muted-foreground font-mono">
-                    They are skipped by Start until you clear failed results. Successful results stay untouched.
+                    They are skipped by Start until you clear failed results. Successful results
+                    stay untouched.
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">

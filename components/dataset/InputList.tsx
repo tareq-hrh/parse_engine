@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/shadcn_ui/button";
 import { DatasetInput, PaginationInfo } from "./types";
@@ -8,14 +8,45 @@ import { InputCard } from "./InputCard";
 
 // refreshKey / datasetSlug changes are handled by the parent via the `key` prop,
 // which remounts this component fresh — so no reset logic is needed here.
-export function InputList({ datasetSlug }: { datasetSlug: string }) {
+export function InputList({
+  datasetSlug,
+  onInputsChanged,
+}: {
+  datasetSlug: string;
+  onInputsChanged: () => void;
+}) {
   const [inputs, setInputs] = useState<DatasetInput[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState(true); // true on fresh mount
 
   const page = pagination?.page ?? 1;
 
-  // Runs once on mount. All setState calls are inside .then() — never synchronous
+  const loadPage = useCallback(
+    async (newPage: number, signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/datasets/${datasetSlug}/inputs?page=${newPage}&limit=20`,
+          { signal },
+        );
+        const data = await res.json();
+        if (!res.ok) return;
+        setInputs(data.inputs ?? []);
+        setPagination(data.pagination ?? null);
+      } catch (err) {
+        if (!(err instanceof Error) || err.name !== "AbortError") {
+          console.error("Failed to fetch inputs");
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [datasetSlug],
+  );
+
+  // Runs once on mount. All setState calls are inside callbacks — never synchronous
   // in the effect body — so the lint rule is satisfied.
   useEffect(() => {
     const controller = new AbortController();
@@ -40,23 +71,32 @@ export function InputList({ datasetSlug }: { datasetSlug: string }) {
       });
 
     return () => controller.abort();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [datasetSlug]);
 
   async function handlePageChange(newPage: number) {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/datasets/${datasetSlug}/inputs?page=${newPage}&limit=20`,
-      );
-      const data = await res.json();
-      if (!res.ok) return;
-      setInputs(data.inputs ?? []);
-      setPagination(data.pagination ?? null);
-    } catch {
-      console.error("Failed to fetch inputs");
-    } finally {
-      setLoading(false);
+    await loadPage(newPage);
+  }
+
+  async function handleInputDeleted(inputId: string) {
+    if (inputs.length === 1 && page > 1) {
+      await loadPage(page - 1);
+      onInputsChanged();
+      return;
     }
+
+    setInputs((prev) => prev.filter((input) => input.id !== inputId));
+    setPagination((prev) => {
+      if (!prev) return prev;
+      const total = Math.max(0, prev.total - 1);
+      const totalPages = Math.ceil(total / prev.limit);
+      return {
+        ...prev,
+        total,
+        totalPages,
+        page: totalPages === 0 ? 1 : Math.min(prev.page, totalPages),
+      };
+    });
+    onInputsChanged();
   }
 
   if (loading) {
@@ -79,7 +119,7 @@ export function InputList({ datasetSlug }: { datasetSlug: string }) {
     <div className="space-y-3">
       <div className="space-y-1.5">
         {inputs.map((input) => (
-          <InputCard key={input.id} input={input} />
+          <InputCard key={input.id} input={input} onDeleted={handleInputDeleted} />
         ))}
       </div>
 

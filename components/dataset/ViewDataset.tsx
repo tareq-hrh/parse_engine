@@ -59,7 +59,11 @@ export function ViewDataset({
 
           {/* ── Inputs tab ──────────────────────────────────────────── */}
           <TabsContent value="inputs" className="mt-3">
-            <InputList key={`${dataset.slug}-${refreshKey}`} datasetSlug={dataset.slug} />
+            <InputList
+              key={`${dataset.slug}-${refreshKey}`}
+              datasetSlug={dataset.slug}
+              onInputsChanged={onInputsChanged}
+            />
           </TabsContent>
 
           {/* ── Add tab ─────────────────────────────────────────────── */}

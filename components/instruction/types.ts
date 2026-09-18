@@ -7,4 +7,4 @@ export interface Instruction {
   updatedAt: string;
 }
 
-export type RightPanelMode = "empty" | "view" | "create";
+export type RightPanelMode = "empty" | "view" | "create" | "edit";

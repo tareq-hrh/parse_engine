@@ -15,21 +15,24 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/shadcn_ui/dropdown-menu";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
-import { Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { Loader2, MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 import { schemaToSimplePreview } from "./SchemaBuilder";
 import { Instruction } from "./types";
 
 interface ViewInstructionProps {
   instruction: Instruction;
+  onEditInstruction: () => void;
   deleteLoading: boolean;
   onDeleteInstruction: () => Promise<boolean>;
 }
 
 export function ViewInstruction({
   instruction,
+  onEditInstruction,
   deleteLoading,
   onDeleteInstruction,
 }: ViewInstructionProps) {
@@ -83,6 +86,15 @@ export function ViewInstruction({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                disabled={deleteLoading}
+                onSelect={onEditInstruction}
+                className="font-mono text-xs"
+              >
+                <PenLine className="size-3.5" />
+                Edit instruction
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
                 disabled={deleteLoading}

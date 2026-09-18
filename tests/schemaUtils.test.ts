@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOutputSchema,
   buildSchemaPreview,
+  schemaToSchemaFields,
   schemaToSimplePreview,
   validateSchemaFields,
   type SchemaField,
@@ -117,5 +118,42 @@ describe("schemaUtils", () => {
       skills: ["string"],
       items: [{ price: "number", labels: ["string"] }],
     });
+  });
+
+  it("converts a stored schema back into editable schema fields", () => {
+    const schema = buildOutputSchema([
+      field({ name: "company", type: "string" }),
+      field({ name: "scores", type: "number[]" }),
+      field({
+        name: "items",
+        type: "object[]",
+        subFields: [
+          { id: "sub-1", name: "description", type: "string" },
+          { id: "sub-2", name: "paid", type: "boolean" },
+        ],
+      }),
+    ]);
+
+    expect(
+      schemaToSchemaFields(schema!).map((converted) => ({
+        name: converted.name,
+        type: converted.type,
+        subFields: converted.subFields.map((subField) => ({
+          name: subField.name,
+          type: subField.type,
+        })),
+      })),
+    ).toEqual([
+      { name: "company", type: "string", subFields: [] },
+      { name: "scores", type: "number[]", subFields: [] },
+      {
+        name: "items",
+        type: "object[]",
+        subFields: [
+          { name: "description", type: "string" },
+          { name: "paid", type: "boolean" },
+        ],
+      },
+    ]);
   });
 });

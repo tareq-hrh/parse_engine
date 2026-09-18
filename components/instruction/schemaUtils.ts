@@ -55,6 +55,78 @@ export function schemaToSimplePreview(
   return Object.keys(result).length === 0 ? null : result;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function primitiveFromValue(value: unknown): PrimitiveType | null {
+  return value === "string" || value === "number" || value === "boolean" ? value : null;
+}
+
+function schemaToSubFieldType(schema: unknown): SubFieldType | null {
+  if (!isPlainObject(schema)) return null;
+
+  const primitiveType = primitiveFromValue(schema.type);
+  if (primitiveType) return primitiveType;
+
+  if (schema.type !== "array" || !isPlainObject(schema.items)) return null;
+
+  const itemType = primitiveFromValue(schema.items.type);
+  return itemType ? `${itemType}[]` : null;
+}
+
+export function schemaToSchemaFields(schema: Record<string, unknown> | null): SchemaField[] {
+  if (!schema || !isPlainObject(schema.properties)) return [];
+
+  const fields: SchemaField[] = [];
+
+  for (const [name, property] of Object.entries(schema.properties)) {
+    if (!isPlainObject(property)) continue;
+
+    if (
+      property.type === "array" &&
+      isPlainObject(property.items) &&
+      property.items.type === "object" &&
+      isPlainObject(property.items.properties)
+    ) {
+      const subFields = Object.entries(property.items.properties).flatMap(
+        ([subName, subProperty]) => {
+          const type = schemaToSubFieldType(subProperty);
+          return type
+            ? [
+                {
+                  id: crypto.randomUUID(),
+                  name: subName,
+                  type,
+                },
+              ]
+            : [];
+        },
+      );
+
+      fields.push({
+        id: crypto.randomUUID(),
+        name,
+        type: "object[]",
+        subFields,
+      });
+      continue;
+    }
+
+    const type = schemaToSubFieldType(property);
+    if (type) {
+      fields.push({
+        id: crypto.randomUUID(),
+        name,
+        type,
+        subFields: [],
+      });
+    }
+  }
+
+  return fields;
+}
+
 export function validateSchemaFields(fields: SchemaField[]): string | null {
   const seenFieldNames = new Set<string>();
 

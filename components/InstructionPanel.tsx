@@ -9,6 +9,7 @@ import { Instruction, RightPanelMode } from "./instruction/types";
 import { InstructionCard } from "./instruction/InstructionCard";
 import { ViewInstruction } from "./instruction/ViewInstruction";
 import { CreateInstructionForm } from "./instruction/CreateInstructionForm";
+import { EditInstructionForm } from "./instruction/EditInstructionForm";
 
 // ── Right Panel: Empty State ──────────────────────────────────────────────────
 function EmptyState() {
@@ -60,9 +61,27 @@ export function InstructionPanel() {
     setMode(selectedId ? "view" : "empty");
   }
 
+  function handleOpenEdit() {
+    setMode("edit");
+  }
+
+  function handleCancelEdit() {
+    setMode(selectedId ? "view" : "empty");
+  }
+
   function handleCreated(newInstruction: Instruction) {
     setInstructions((prev) => [newInstruction, ...prev]);
     setSelectedId(newInstruction.id);
+    setMode("view");
+  }
+
+  function handleUpdated(updatedInstruction: Instruction) {
+    setInstructions((prev) =>
+      prev.map((instruction) =>
+        instruction.id === updatedInstruction.id ? updatedInstruction : instruction,
+      ),
+    );
+    setSelectedId(updatedInstruction.id);
     setMode("view");
   }
 
@@ -150,12 +169,21 @@ export function InstructionPanel() {
         {mode === "view" && selectedInstruction && (
           <ViewInstruction
             instruction={selectedInstruction}
+            onEditInstruction={handleOpenEdit}
             deleteLoading={deleteLoading}
             onDeleteInstruction={handleDeleteInstruction}
           />
         )}
         {mode === "create" && (
           <CreateInstructionForm onCreated={handleCreated} onCancel={handleCancelCreate} />
+        )}
+        {mode === "edit" && selectedInstruction && (
+          <EditInstructionForm
+            key={selectedInstruction.id}
+            instruction={selectedInstruction}
+            onUpdated={handleUpdated}
+            onCancel={handleCancelEdit}
+          />
         )}
       </div>
     </div>

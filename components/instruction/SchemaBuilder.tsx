@@ -13,6 +13,7 @@ import {
 import {
   buildOutputSchema,
   buildSchemaPreview,
+  schemaToSchemaFields,
   schemaToSimplePreview,
   validateSchemaFields,
   type SchemaField,
@@ -22,7 +23,7 @@ import {
 } from "./schemaUtils";
 
 export type { SchemaField, SubField, SubFieldType, TopLevelFieldType };
-export { buildOutputSchema, schemaToSimplePreview, validateSchemaFields };
+export { buildOutputSchema, schemaToSchemaFields, schemaToSimplePreview, validateSchemaFields };
 
 // ─── Dropdown options ─────────────────────────────────────────────────────────
 

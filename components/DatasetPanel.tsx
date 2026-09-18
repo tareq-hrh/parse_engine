@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Plus, Loader2 } from "lucide-react";
@@ -22,6 +23,7 @@ export function DatasetPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<RightPanelMode>("empty");
   const [loading, setLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchDatasets = useCallback(async () => {
     try {
@@ -60,6 +62,35 @@ export function DatasetPanel() {
     setDatasets((prev) => [newDataset, ...prev]);
     setSelectedId(newDataset.id);
     setMode("view");
+  }
+
+  async function handleDeleteDataset(): Promise<boolean> {
+    const selectedDataset = datasets.find((dataset) => dataset.id === selectedId);
+    if (!selectedDataset) return false;
+
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/datasets/${selectedDataset.slug}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete dataset.");
+        return false;
+      }
+
+      setDatasets((prev) => prev.filter((dataset) => dataset.id !== selectedDataset.id));
+      setSelectedId(null);
+      setMode("empty");
+      toast.success(data.message || "Dataset deleted.");
+      return true;
+    } catch {
+      toast.error("Network error. Please try again.");
+      return false;
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   // Called after any inputs are added so the input count updates in the card
@@ -119,7 +150,12 @@ export function DatasetPanel() {
         {mode === "empty" && <EmptyState />}
 
         {mode === "view" && selectedDataset && (
-          <ViewDataset dataset={selectedDataset} onInputsChanged={handleInputsChanged} />
+          <ViewDataset
+            dataset={selectedDataset}
+            deleteLoading={deleteLoading}
+            onDeleteDataset={handleDeleteDataset}
+            onInputsChanged={handleInputsChanged}
+          />
         )}
 
         {mode === "create" && (

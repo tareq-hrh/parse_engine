@@ -1,0 +1,125 @@
+"use client";
+
+import { useState } from "react";
+import { toast } from "react-toastify";
+import { Button } from "@/components/shadcn_ui/button";
+import { Input } from "@/components/shadcn_ui/input";
+import { Label } from "@/components/shadcn_ui/label";
+import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
+import { Textarea } from "@/components/shadcn_ui/textarea";
+import { Loader2, Save, X } from "lucide-react";
+import { Dataset } from "./types";
+
+export function EditDatasetForm({
+  dataset,
+  onUpdated,
+  onCancel,
+}: {
+  dataset: Dataset;
+  onUpdated: (dataset: Dataset) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(dataset.name);
+  const [description, setDescription] = useState(dataset.description ?? "");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSave() {
+    if (!name.trim()) {
+      toast.error("Dataset name is required.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/datasets/${dataset.slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update dataset.");
+        return;
+      }
+
+      toast.success("Dataset updated.");
+      onUpdated(data);
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="px-3 py-4 border-b border-border shrink-0 flex items-center justify-between">
+        <h2 className="font-mono text-base font-semibold text-foreground">Edit Dataset</h2>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          disabled={loading}
+          className="font-mono text-xs gap-1.5 text-muted-foreground"
+        >
+          <X className="size-3.5" />
+          Cancel
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="p-5 space-y-5">
+          <div className="space-y-2">
+            <Label
+              htmlFor="edit-dataset-name"
+              className="font-mono text-xs uppercase tracking-wider"
+            >
+              Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="edit-dataset-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="e.g. Invoices 2025"
+              className="font-mono text-sm"
+            />
+            <p className="font-mono text-[11px] text-muted-foreground">
+              API slug stays: <span className="text-foreground">{dataset.slug}</span>
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label
+              htmlFor="edit-dataset-description"
+              className="font-mono text-xs uppercase tracking-wider"
+            >
+              Description{" "}
+              <span className="text-muted-foreground normal-case tracking-normal">(optional)</span>
+            </Label>
+            <Textarea
+              id="edit-dataset-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="e.g. Invoices from 2025"
+              className="font-mono text-xs h-24"
+            />
+          </div>
+
+          <Button
+            onClick={handleSave}
+            disabled={loading}
+            className="w-full font-mono text-xs gap-2 bg-blue-600 hover:bg-blue-500 text-white"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {loading ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </ScrollArea>
+    </>
+  );
+}

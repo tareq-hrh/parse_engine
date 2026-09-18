@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isApiValidationError,
+  readJsonObject,
+  readOptionalTrimmedString,
+  readRequiredTrimmedString,
+} from "@/lib/apiValidation";
 import { deleteDataset, isDeleteDatasetError } from "@/lib/datasetDelete";
+import { isUpdateDatasetError, updateDataset } from "@/lib/datasetUpdate";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -19,6 +26,33 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ ...dataset, inputCount }, { status: 200 });
   } catch (error) {
     console.error("❌ Failed to fetch dataset:", error);
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  try {
+    const { slug } = await params;
+    const body = await readJsonObject(request);
+    const name = readRequiredTrimmedString(body.name, "Dataset name");
+    const description = readOptionalTrimmedString(body.description, "Dataset description") ?? null;
+
+    const result = await updateDataset({
+      datasetSlug: slug,
+      name,
+      description,
+    });
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (error) {
+    if (isApiValidationError(error) || isUpdateDatasetError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    console.error("❌ Failed to update dataset:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

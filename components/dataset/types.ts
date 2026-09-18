@@ -36,4 +36,4 @@ export interface PaginationInfo {
   totalPages: number;
 }
 
-export type RightPanelMode = "empty" | "view" | "create";
+export type RightPanelMode = "empty" | "view" | "create" | "edit";

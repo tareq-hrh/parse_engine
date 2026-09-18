@@ -8,6 +8,7 @@ import { Plus, Loader2 } from "lucide-react";
 import { Dataset, RightPanelMode } from "./dataset/types";
 import { DatasetCard } from "./dataset/DatasetCard";
 import { CreateDatasetForm } from "./dataset/CreateDatasetForm";
+import { EditDatasetForm } from "./dataset/EditDatasetForm";
 import { ViewDataset } from "./dataset/ViewDataset";
 
 function EmptyState() {
@@ -58,9 +59,25 @@ export function DatasetPanel() {
     setMode(selectedId ? "view" : "empty");
   }
 
+  function handleOpenEdit() {
+    setMode("edit");
+  }
+
+  function handleCancelEdit() {
+    setMode(selectedId ? "view" : "empty");
+  }
+
   function handleCreated(newDataset: Dataset) {
     setDatasets((prev) => [newDataset, ...prev]);
     setSelectedId(newDataset.id);
+    setMode("view");
+  }
+
+  function handleUpdated(updatedDataset: Dataset) {
+    setDatasets((prev) =>
+      prev.map((dataset) => (dataset.id === updatedDataset.id ? updatedDataset : dataset)),
+    );
+    setSelectedId(updatedDataset.id);
     setMode("view");
   }
 
@@ -152,6 +169,7 @@ export function DatasetPanel() {
         {mode === "view" && selectedDataset && (
           <ViewDataset
             dataset={selectedDataset}
+            onEditDataset={handleOpenEdit}
             deleteLoading={deleteLoading}
             onDeleteDataset={handleDeleteDataset}
             onInputsChanged={handleInputsChanged}
@@ -160,6 +178,14 @@ export function DatasetPanel() {
 
         {mode === "create" && (
           <CreateDatasetForm onCreated={handleCreated} onCancel={handleCancelCreate} />
+        )}
+        {mode === "edit" && selectedDataset && (
+          <EditDatasetForm
+            key={selectedDataset.id}
+            dataset={selectedDataset}
+            onUpdated={handleUpdated}
+            onCancel={handleCancelEdit}
+          />
         )}
       </div>
     </div>

@@ -16,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/shadcn_ui/dropdown-menu";
 import { List, PlusCircle, PenLine, Upload, Code2, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
@@ -28,11 +29,13 @@ type InputMethod = "manual" | "upload" | "api";
 
 export function ViewDataset({
   dataset,
+  onEditDataset,
   deleteLoading,
   onDeleteDataset,
   onInputsChanged,
 }: {
   dataset: Dataset;
+  onEditDataset: () => void;
   deleteLoading: boolean;
   onDeleteDataset: () => Promise<boolean>;
   onInputsChanged: () => void;
@@ -96,6 +99,15 @@ export function ViewDataset({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem
+                  disabled={deleteLoading}
+                  onSelect={onEditDataset}
+                  className="font-mono text-xs"
+                >
+                  <PenLine className="size-3.5" />
+                  Edit dataset
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
                   disabled={deleteLoading}

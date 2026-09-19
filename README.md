@@ -255,6 +255,8 @@ Each extraction attempt stores an `ExtractionResult` with information such as:
 
 Successful results can be filtered in the UI using facets generated from the extracted data.
 
+Individual successful or failed results can be deleted from a stopped extraction job. Deleting a result removes only that extraction result; the dataset input remains available and can be processed again the next time the same job starts.
+
 ### JSON export
 
 The browser export contains successful results in this shape:
@@ -300,6 +302,7 @@ The UI uses the same local API routes exposed by the Next.js application.
 | `POST` | `/api/extraction-jobs/{jobId}/retry-failed` | Clear failed results for retry          |
 | `GET`  | `/api/extraction-jobs/{jobId}/events`  | Stream job events over SSE                    |
 | `GET`  | `/api/extraction-jobs/{jobId}/results` | Get job results                               |
+| `DELETE` | `/api/extraction-jobs/{jobId}/results/{resultId}` | Delete one stopped-job result     |
 | `GET`  | `/api/ollama/models`                   | List installed Ollama models and capabilities |
 
 ## Local-first data boundary

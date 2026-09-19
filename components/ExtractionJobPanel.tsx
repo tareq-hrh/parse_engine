@@ -33,6 +33,7 @@ interface ExtractionJobPanelProps {
   onSelectJob: (id: string) => Promise<void>; // triggers snapshot fetch + viewedJobId tracking
   onStarted: (jobId: string) => void;         // triggers SSE stream open after successful start
   onDeletedJob: (id: string) => void;
+  onDeletedResult: (jobId: string, resultId: string) => Promise<boolean>;
   onClearedSelection: () => void;
 }
 
@@ -47,6 +48,7 @@ export function ExtractionJobPanel({
   onSelectJob,
   onStarted,
   onDeletedJob,
+  onDeletedResult,
   onClearedSelection,
 }: ExtractionJobPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -250,6 +252,7 @@ export function ExtractionJobPanel({
               onRetryFailed={handleRetryFailed}
               deleteLoading={deleteLoading}
               onDeleteJob={handleDeleteJob}
+              onDeleteResult={(resultId) => onDeletedResult(selectedJob.id, resultId)}
             />
           )}
 

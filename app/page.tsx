@@ -279,6 +279,50 @@ export default function Home() {
     setFailedResults([]);
   }, []);
 
+  const handleDeletedResult = useCallback(
+    async (jobId: string, resultId: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/extraction-jobs/${jobId}/results/${resultId}`, {
+          method: "DELETE",
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          toast.error(data.error || "Failed to delete extraction result.");
+          return false;
+        }
+
+        setSuccessfulResults((prev) => prev.filter((result) => result.id !== resultId));
+        setFailedResults((prev) => prev.filter((result) => result.id !== resultId));
+        setJobs((prev) =>
+          prev.map((job) =>
+            job.id === jobId
+              ? {
+                  ...job,
+                  successfulResultCount:
+                    data.successfulResultCount ?? job.successfulResultCount,
+                  failedResultCount: data.failedResultCount ?? job.failedResultCount,
+                  totalInputCount: data.totalInputCount ?? job.totalInputCount,
+                }
+              : job,
+          ),
+        );
+
+        await fetchJobs();
+        if (viewedJobIdRef.current === jobId) {
+          await fetchResultsSnapshot(jobId);
+        }
+
+        toast.success(data.message || "Extraction result deleted.");
+        return true;
+      } catch {
+        toast.error("Network error. Please try again.");
+        return false;
+      }
+    },
+    [fetchJobs, fetchResultsSnapshot],
+  );
+
   const handleClearedJobSelection = useCallback(() => {
     viewedJobIdRef.current = null;
     setSuccessfulResults([]);
@@ -491,6 +535,7 @@ export default function Home() {
               onSelectJob={handleSelectJob}
               onStarted={handleStarted}
               onDeletedJob={handleDeletedJob}
+              onDeletedResult={handleDeletedResult}
               onClearedSelection={handleClearedJobSelection}
             />
           </TabsContent>

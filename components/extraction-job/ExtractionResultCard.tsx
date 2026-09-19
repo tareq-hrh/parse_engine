@@ -2,7 +2,23 @@
 
 import { useState } from "react";
 import { Separator } from "@/components/shadcn_ui/separator";
-import { Clock, Loader2 } from "lucide-react";
+import { Button } from "@/components/shadcn_ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn_ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/shadcn_ui/dropdown-menu";
+import { Clock, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import {
   fetchDatasetInputContent,
   getDatasetInputContentErrorMessage,
@@ -138,11 +154,21 @@ function FlatObjectTable({ rows }: { rows: FlatObject[] }) {
 
 // ── Main ExtractionResultCard ────────────────────────────────────────────────────────
 
-export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
+export function ExtractionResultCard({
+  result,
+  deleteDisabled,
+  onDeleteResult,
+}: {
+  result: ExtractionResult;
+  deleteDisabled: boolean;
+  onDeleteResult: (resultId: string) => Promise<boolean>;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [content, setContent] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const contentId = `result-input-content-${result.id}`;
 
   async function handleToggle() {
@@ -166,6 +192,18 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
     setExpanded(true);
   }
 
+  async function handleConfirmDelete() {
+    setDeleteLoading(true);
+    try {
+      const deleted = await onDeleteResult(result.id);
+      if (deleted) {
+        setDeleteDialogOpen(false);
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   const d = result.extractedData!;
   const entries = Object.entries(d).filter(([, val]) => {
     if (val === null || val === undefined || val === "") return false;
@@ -176,7 +214,7 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
   return (
     <div className="border border-border bg-surface-raised rounded-lg p-3 space-y-2">
       {/* ── Header row: timestamp ───────────────────────────────────────── */}
-      <div className="flex items-center justify-start">
+      <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-xs text-muted-foreground/80 shrink-0">
           {new Date(result.createdAt).toLocaleString("en-US", {
             month: "short",
@@ -185,6 +223,73 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
             minute: "2-digit",
           })}
         </p>
+        <Dialog
+          open={deleteDialogOpen}
+          onOpenChange={(open) => {
+            if (!deleteLoading) setDeleteDialogOpen(open);
+          }}
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                disabled={deleteLoading}
+                className="rounded-sm text-muted-foreground hover:text-foreground"
+                aria-label={`Open actions for result ${result.inputLabel}`}
+              >
+                {deleteLoading ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="size-3" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={deleteDisabled || deleteLoading}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setDeleteDialogOpen(true);
+                }}
+                className="font-mono text-xs"
+              >
+                <Trash2 className="size-3.5" />
+                Delete result
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DialogContent className="font-mono">
+            <DialogHeader>
+              <DialogTitle>Delete extraction result?</DialogTitle>
+              <DialogDescription>
+                This deletes only this result. The dataset input stays available and can be
+                processed again when this job starts.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-sm border border-border bg-muted/30 p-3 text-xs">
+              <div className="text-muted-foreground uppercase tracking-wider">Input</div>
+              <div className="mt-1 text-foreground wrap-break-word">{result.inputLabel}</div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline" disabled={deleteLoading} className="font-mono text-xs">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={deleteLoading}
+                onClick={handleConfirmDelete}
+                className="font-mono text-xs gap-1.5"
+              >
+                {deleteLoading && <Loader2 className="size-3.5 animate-spin" />}
+                Delete result
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Separator />

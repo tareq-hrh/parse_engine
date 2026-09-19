@@ -60,6 +60,7 @@ export function ExtractionJobDetails({
   onRetryFailed,
   deleteLoading,
   onDeleteJob,
+  onDeleteResult,
 }: {
   job: ExtractionJob;
   successfulResults: ExtractionResult[];
@@ -71,6 +72,7 @@ export function ExtractionJobDetails({
   onRetryFailed: () => void;
   deleteLoading: boolean;
   onDeleteJob: () => Promise<boolean>;
+  onDeleteResult: (resultId: string) => Promise<boolean>;
 }) {
   const [activeFilters, setActiveFilters] = useState<FilterState>({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -81,6 +83,7 @@ export function ExtractionJobDetails({
   const status = getJobStatus(job);
   const total = job.totalInputCount;
   const deleteDisabled = deleteLoading || actionLoading || retryFailedLoading || hasRunningJob;
+  const resultDeleteDisabled = actionLoading || retryFailedLoading || deleteLoading || hasRunningJob;
 
   const successPercent =
     total > 0 ? Math.min(100, Math.round((job.successfulResultCount / total) * 100)) : 0;
@@ -452,7 +455,12 @@ export function ExtractionJobDetails({
                   <ScrollArea type="auto" className="h-500 pr-3">
                     <div className="space-y-4">
                       {filteredSuccessfulResults.map((result) => (
-                        <ExtractionResultCard key={result.id} result={result} />
+                        <ExtractionResultCard
+                          key={result.id}
+                          result={result}
+                          deleteDisabled={resultDeleteDisabled}
+                          onDeleteResult={onDeleteResult}
+                        />
                       ))}
                     </div>
                   </ScrollArea>
@@ -496,7 +504,12 @@ export function ExtractionJobDetails({
               <ScrollArea type="auto" className="h-500 pr-3">
                 <div className="space-y-4">
                   {failedResults.map((result) => (
-                    <FailedResultCard key={result.id} result={result} />
+                    <FailedResultCard
+                      key={result.id}
+                      result={result}
+                      deleteDisabled={resultDeleteDisabled}
+                      onDeleteResult={onDeleteResult}
+                    />
                   ))}
                 </div>
               </ScrollArea>

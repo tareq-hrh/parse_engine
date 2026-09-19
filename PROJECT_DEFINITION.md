@@ -455,6 +455,12 @@ This provides continuation without duplicating already persisted results.
 
 After failed rows are cleared, the next job start treats those inputs as unprocessed for that job and sends them to the model again. Successful rows are not removed.
 
+### Deleting individual results
+
+`DELETE /api/extraction-jobs/{jobId}/results/{resultId}` deletes a single `ExtractionResult` for a stopped job. It is blocked while any extraction job is active.
+
+This operation does not delete the dataset input. It only removes the job/input result row, so the input can be processed again by the same job.
+
 ---
 
 ## 9. Real-time progress
@@ -575,6 +581,7 @@ POST /api/extraction-jobs/{jobId}/stop
 POST /api/extraction-jobs/{jobId}/retry-failed
 GET  /api/extraction-jobs/{jobId}/events
 GET  /api/extraction-jobs/{jobId}/results
+DELETE /api/extraction-jobs/{jobId}/results/{resultId}
 ```
 
 ### Ollama
@@ -602,6 +609,7 @@ The API currently has no authentication layer and is intended for local/trusted 
 | Instruction delete requires no jobs          | Delete API validation                                 |
 | Job deletion removes its results first       | Transactional delete helper                           |
 | Failed-result retry preserves successes      | Retry API deletes only failed rows                    |
+| Individual result delete preserves input     | Result delete API removes only one result row         |
 | Only one job runs at once                    | Start API validation                                  |
 | Job cannot start while Ollama is unreachable | Start API health check                                |
 | Stop only applies to a running job           | Stop API validation                                   |

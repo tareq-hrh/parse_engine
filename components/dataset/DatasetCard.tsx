@@ -16,7 +16,7 @@ export function DatasetCard({
       onClick={onClick}
       aria-current={isSelected ? "true" : undefined}
       aria-label={`Open dataset ${dataset.name}`}
-      className={`w-full text-left p-3 border rounded-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+      className={`w-full text-left p-2 border rounded-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
         isSelected
           ? "border-blue-500/40 bg-blue-500/5"
           : "border-border bg-card hover:border-blue-500/30"
@@ -24,8 +24,8 @@ export function DatasetCard({
     >
       <div className="flex items-start justify-between gap-2 mb-1">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Database className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-          <span className="font-mono text-sm text-foreground line-clamp-2 leading-tight">
+          <Database className="size-3 text-muted-foreground shrink-0 mt-0.5" />
+          <span className="max-w-50 font-mono text-sm text-foreground truncate">
             {dataset.name}
           </span>
         </div>

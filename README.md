@@ -281,16 +281,23 @@ The UI uses the same local API routes exposed by the Next.js application.
 | `GET`  | `/api/datasets`                        | List datasets                                 |
 | `POST` | `/api/datasets`                        | Create a dataset                              |
 | `GET`  | `/api/datasets/{slug}`                 | Get a dataset                                 |
+| `PATCH` | `/api/datasets/{slug}`                | Update dataset name and description           |
+| `DELETE` | `/api/datasets/{slug}`               | Delete an unused dataset and its inputs       |
 | `GET`  | `/api/datasets/{slug}/inputs`          | List dataset inputs                           |
 | `POST` | `/api/datasets/{slug}/inputs`          | Add inputs by dataset slug                    |
 | `POST` | `/api/dataset-inputs`                  | Core input-ingestion endpoint                 |
 | `GET`  | `/api/dataset-inputs/{inputId}`        | Get one dataset input                         |
+| `DELETE` | `/api/dataset-inputs/{inputId}`      | Delete an unused dataset input                |
 | `GET`  | `/api/instructions`                    | List instructions                             |
 | `POST` | `/api/instructions`                    | Create an instruction                         |
+| `PATCH` | `/api/instructions/{instructionId}`   | Update an instruction                         |
+| `DELETE` | `/api/instructions/{instructionId}`  | Delete an unused instruction                  |
 | `GET`  | `/api/extraction-jobs`                 | List extraction jobs                          |
 | `POST` | `/api/extraction-jobs`                 | Create an extraction job                      |
+| `DELETE` | `/api/extraction-jobs/{jobId}`       | Delete a stopped extraction job and results   |
 | `POST` | `/api/extraction-jobs/{jobId}/start`   | Start or continue a job                       |
 | `POST` | `/api/extraction-jobs/{jobId}/stop`    | Stop a running job                            |
+| `POST` | `/api/extraction-jobs/{jobId}/retry-failed` | Clear failed results for retry          |
 | `GET`  | `/api/extraction-jobs/{jobId}/events`  | Stream job events over SSE                    |
 | `GET`  | `/api/extraction-jobs/{jobId}/results` | Get job results                               |
 | `GET`  | `/api/ollama/models`                   | List installed Ollama models and capabilities |
@@ -317,6 +324,9 @@ npm run dev              # Start development server on port 4000
 npm run build            # Create a production build
 npm run start            # Start production server on port 4000
 npm run lint             # Run ESLint
+npm run check            # Run lint, TypeScript, and Prisma validation
+npm run test             # Run the Vitest test suite
+npm run test:watch       # Run tests in watch mode
 npm run prisma:generate  # Generate Prisma Client
 npm run prisma:migrate   # Run Prisma development migrations
 npm run prisma:studio    # Open Prisma Studio
@@ -336,6 +346,15 @@ components/
   shadcn_ui/              Reusable UI primitives
 
 lib/
+  env.ts                  Runtime environment parsing and validation
+  datasetInputIngestion.ts Shared dataset input ingestion logic
+  datasetUpdate.ts        Dataset metadata update behavior
+  datasetDelete.ts        Dataset delete safety rules
+  datasetInputDelete.ts   Dataset input delete safety rules
+  instructionUpdate.ts    Instruction update behavior
+  instructionDelete.ts    Instruction delete safety rules
+  extractionJobRetry.ts   Failed-result retry cleanup
+  extractionJobDelete.ts  Job deletion and result cleanup
   extractionJobRunner.ts  Batch processing engine
   extractionJobEvents.ts  In-memory SSE event bridge
   ollamaClient.ts         Ollama integration

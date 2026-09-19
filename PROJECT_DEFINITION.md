@@ -20,6 +20,7 @@ The current architecture prioritizes:
 - **structured outputs** — optional JSON schemas constrain the expected model output;
 - **recoverable execution** — restarting a partially processed job skips inputs that already have results;
 - **observability** — each result stores the information needed to inspect what was sent to and returned by the model;
+- **safe cleanup workflows** — destructive actions check active jobs and data relationships before removing records;
 - **simple runtime coordination** — only one extraction job is allowed to run at a time;
 - **minimal infrastructure** — the application requires Next.js, SQLite, and an Ollama endpoint rather than external application services.
 
@@ -95,6 +96,10 @@ Key properties:
 
 A dataset contains many `DatasetInput` records and can be referenced by multiple extraction jobs.
 
+Dataset names and descriptions can be edited. The dataset slug remains stable so existing API paths do not change after a rename.
+
+A dataset can be deleted only when no extraction jobs reference it. When an unused dataset is deleted, its inputs are deleted with it.
+
 ### 4.2 DatasetInput
 
 A `DatasetInput` is one raw text item inside a dataset and is the atomic unit processed by an extraction job.
@@ -117,6 +122,8 @@ The database enforces two uniqueness rules inside each dataset:
 Therefore a dataset cannot contain the same normalized content twice or reuse the same label twice.
 
 Duplicate detection is also performed in memory during batch ingestion so duplicate items within the same submitted batch are rejected before persistence.
+
+A dataset input can be deleted only when no extraction results reference it. Inputs that have already been processed by any extraction job are protected until the related extraction jobs are deleted.
 
 ### 4.3 Instruction
 
@@ -155,6 +162,8 @@ object[]
 ```
 
 `object[]` supports flat sub-fields using the scalar and primitive-array types above.
+
+Instructions can be edited after creation. An instruction can be deleted only when no extraction jobs reference it.
 
 ### 4.4 ExtractionJob
 
@@ -409,6 +418,8 @@ The error message and audit information are stored with the result.
 
 Because the job/input result pair is unique, failed inputs are considered accounted for when the same job is started again.
 
+Failed results can be intentionally cleared from a stopped extraction job. Starting the job again after clearing failed results retries only the inputs whose failed rows were removed. Successful results are preserved.
+
 ---
 
 ## 8. Stop and continue behavior
@@ -437,6 +448,12 @@ The runner loads all existing results for the job and skips every DatasetInput t
 The previously interrupted input has no result, so it remains eligible for processing.
 
 This provides continuation without duplicating already persisted results.
+
+### Retrying failed rows
+
+`POST /api/extraction-jobs/{jobId}/retry-failed` deletes failed `ExtractionResult` rows for a stopped job. It is blocked while any extraction job is active.
+
+After failed rows are cleared, the next job start treats those inputs as unprocessed for that job and sends them to the model again. Successful rows are not removed.
 
 ---
 
@@ -524,6 +541,8 @@ The output file name is based on the extraction-job title.
 GET  /api/datasets
 POST /api/datasets
 GET  /api/datasets/{slug}
+PATCH /api/datasets/{slug}
+DELETE /api/datasets/{slug}
 GET  /api/datasets/{slug}/inputs
 POST /api/datasets/{slug}/inputs
 ```
@@ -533,6 +552,7 @@ POST /api/datasets/{slug}/inputs
 ```text
 POST /api/dataset-inputs
 GET  /api/dataset-inputs/{inputId}
+DELETE /api/dataset-inputs/{inputId}
 ```
 
 ### Instructions
@@ -540,6 +560,8 @@ GET  /api/dataset-inputs/{inputId}
 ```text
 GET  /api/instructions
 POST /api/instructions
+PATCH /api/instructions/{instructionId}
+DELETE /api/instructions/{instructionId}
 ```
 
 ### Extraction jobs
@@ -547,8 +569,10 @@ POST /api/instructions
 ```text
 GET  /api/extraction-jobs
 POST /api/extraction-jobs
+DELETE /api/extraction-jobs/{jobId}
 POST /api/extraction-jobs/{jobId}/start
 POST /api/extraction-jobs/{jobId}/stop
+POST /api/extraction-jobs/{jobId}/retry-failed
 GET  /api/extraction-jobs/{jobId}/events
 GET  /api/extraction-jobs/{jobId}/results
 ```
@@ -573,6 +597,11 @@ The API currently has no authentication layer and is intended for local/trusted 
 | Label is unique within a dataset             | `(label, datasetId)` unique constraint                |
 | One result per input/job pair                | `(datasetInputId, extractionJobId)` unique constraint |
 | Result lookup by job/status is indexed       | `(extractionJobId, status)` index                     |
+| Dataset delete requires no referencing jobs  | Delete API validation                                 |
+| Dataset input delete requires no results     | Delete API validation                                 |
+| Instruction delete requires no jobs          | Delete API validation                                 |
+| Job deletion removes its results first       | Transactional delete helper                           |
+| Failed-result retry preserves successes      | Retry API deletes only failed rows                    |
 | Only one job runs at once                    | Start API validation                                  |
 | Job cannot start while Ollama is unreachable | Start API health check                                |
 | Stop only applies to a running job           | Stop API validation                                   |
@@ -610,7 +639,7 @@ The current design intentionally keeps several constraints simple:
 - in-memory SSE event coordination within one application process;
 - no authentication/multi-user model;
 - `.txt` files only for browser file ingestion;
-- no automatic retry of failed results within the same extraction job;
+- no automatic retry of failed results within the same extraction job; failed rows must be cleared intentionally before retry;
 - JSON export is generated client-side from successful results.
 
 These constraints keep the application predictable and appropriate for a local-first single-machine workflow.

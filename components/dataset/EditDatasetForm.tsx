@@ -58,18 +58,29 @@ export function EditDatasetForm({
 
   return (
     <>
-      <div className="px-3 py-4 border-b border-border shrink-0 flex items-center justify-between">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-mono text-base font-semibold text-foreground">Edit Dataset</h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          disabled={loading}
-          className="font-mono text-xs gap-1.5 text-muted-foreground"
-        >
-          <X className="size-3.5" />
-          Cancel
-        </Button>
+        <div className="flex gap-2 sm:justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 font-mono text-xs gap-1.5 text-muted-foreground sm:flex-none"
+          >
+            <X className="size-3.5" />
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={loading}
+            className="flex-1 font-mono text-xs gap-1.5 bg-blue-600 hover:bg-blue-500 text-white sm:flex-none"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {loading ? "Saving..." : "Save"}
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
@@ -110,14 +121,6 @@ export function EditDatasetForm({
             />
           </div>
 
-          <Button
-            onClick={handleSave}
-            disabled={loading}
-            className="w-full font-mono text-xs gap-2 bg-blue-600 hover:bg-blue-500 text-white"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {loading ? "Saving..." : "Save Changes"}
-          </Button>
         </div>
       </ScrollArea>
     </>

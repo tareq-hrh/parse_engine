@@ -25,12 +25,12 @@ export function SegmentedSelector<T extends string | number | null>({
   };
 
   return (
-    <div className="overflow-x-auto pb-2">
+    <div className="w-full pb-2">
       <RadioGroup
         value={toStr(value)}
         onValueChange={(s) => onChange(fromStr(s))}
         aria-label={ariaLabel}
-        className="relative flex min-w-[24rem] items-center justify-between"
+        className="relative flex min-w-80 items-center justify-between"
       >
         {/* ── Connecting track line ─────────────────────────────────────── */}
         <div className="absolute left-0 top-2 right-0 h-px bg-border pointer-events-none" />

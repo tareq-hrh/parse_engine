@@ -73,17 +73,28 @@ export function CreateInstructionForm({
   return (
     <>
       {/* Header */}
-      <div className="p-5 border-b border-border shrink-0 flex items-center justify-between">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-mono text-base font-semibold text-foreground">New Instruction</h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          className="font-mono text-xs gap-1.5 text-muted-foreground"
-        >
-          <X className="w-3.5 h-3.5" />
-          Cancel
-        </Button>
+        <div className="flex gap-2 sm:justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            className="flex-1 font-mono text-xs gap-1.5 text-muted-foreground sm:flex-none"
+          >
+            <X className="w-3.5 h-3.5" />
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleCreate}
+            disabled={loading}
+            className="flex-1 font-mono text-xs gap-1.5 bg-blue-600 hover:bg-blue-500 text-white sm:flex-none"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {loading ? "Creating..." : "Create"}
+          </Button>
+        </div>
       </div>
 
       {/* Form */}
@@ -144,14 +155,6 @@ export function CreateInstructionForm({
             model as a structured-output constraint. <span className="text-purple-400/70">object[]</span> fields support
             nested sub-fields (e.g. line items).
           </p>
-          <Button
-            onClick={handleCreate}
-            disabled={loading}
-            className="w-full font-mono text-xs gap-2 bg-blue-600 hover:bg-blue-500 text-white"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            {loading ? "Creating..." : "Create Instruction"}
-          </Button>
         </div>
       </ScrollArea>
     </>

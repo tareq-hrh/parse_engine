@@ -141,6 +141,7 @@ export function ManualInputForm({
             value={autoPrefix}
             onChange={(e) => setAutoPrefix(e.target.value)}
             placeholder="Prefix, e.g. Input_"
+            aria-label="Auto-label prefix"
             className="font-mono text-xs rounded-sm w-60"
           />
         </div>
@@ -151,6 +152,7 @@ export function ManualInputForm({
             min={0}
             value={autoStart}
             onChange={(e) => setAutoStart(Number(e.target.value))}
+            aria-label="Starting number"
             className="font-mono text-xs rounded-sm w-14 shrink-0"
           />
         </div>
@@ -160,6 +162,7 @@ export function ManualInputForm({
           <RadioGroup
             value={autoMode}
             onValueChange={(v) => setAutoMode(v as "fill" | "overwrite")}
+            aria-label="Auto-label mode"
             className="flex items-center gap-3 shrink-0 h-8"
           >
             <div className="flex items-center gap-1">
@@ -223,6 +226,7 @@ export function ManualInputForm({
               value={row.label}
               onChange={(e) => updateRow(row.id, "label", e.target.value)}
               placeholder={`e.g. Input_${index + 1}`}
+              aria-label={`Row ${index + 1} label`}
               className="font-mono text-xs rounded-sm"
             />
 
@@ -231,6 +235,7 @@ export function ManualInputForm({
               value={row.content}
               onChange={(e) => updateRow(row.id, "content", e.target.value)}
               placeholder="Paste or type the raw text here..."
+              aria-label={`Row ${index + 1} content`}
               className="font-mono text-xs rounded-sm resize-y h-25 max-h-50"
             />
 

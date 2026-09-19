@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDown, Gauge } from "lucide-react";
 import type { UsageMetrics } from "./types";
 import { formatTokenCount, formatUsageDuration } from "./usageMetricsUtils";
 
 export function UsageMetricsDisclosure({ metrics }: { metrics: UsageMetrics | null }) {
   const [open, setOpen] = useState(false);
+  const metricsId = useId();
 
   if (!metrics) return null;
 
@@ -15,7 +16,9 @@ export function UsageMetricsDisclosure({ metrics }: { metrics: UsageMetrics | nu
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        aria-expanded={open}
+        aria-controls={metricsId}
+        className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm"
       >
         <Gauge className="size-3" />
         Metrics
@@ -26,7 +29,10 @@ export function UsageMetricsDisclosure({ metrics }: { metrics: UsageMetrics | nu
       </button>
 
       {open && (
-        <div className="grid gap-2 rounded-sm border border-border bg-muted/20 p-2 font-mono text-[10px] text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+        <div
+          id={metricsId}
+          className="grid gap-2 rounded-sm border border-border bg-muted/20 p-2 font-mono text-[10px] text-muted-foreground sm:grid-cols-2 xl:grid-cols-4"
+        >
           <MetricItem label="Total" value={formatUsageDuration(metrics.totalDuration)} />
           <MetricItem label="Load" value={formatUsageDuration(metrics.loadDuration)} />
           <MetricItem

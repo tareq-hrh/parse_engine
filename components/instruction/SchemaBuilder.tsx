@@ -64,17 +64,20 @@ function TypeSelect<T extends string>({
   value,
   options,
   size = "default",
+  ariaLabel,
   onChange,
 }: {
   value: T;
   options: { value: T; label: string }[];
   size?: "default" | "sm";
+  ariaLabel: string;
   onChange: (v: T) => void;
 }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as T)}>
       <SelectTrigger
         size={size}
+        aria-label={ariaLabel}
         className={`rounded-sm font-mono text-[11px] w-27 shrink-0 ${TYPE_COLOR[value] ?? ""}`}
       >
         <SelectValue />
@@ -179,12 +182,14 @@ export function SchemaBuilder({ value, onChange }: SchemaBuilderProps) {
                     value={field.name}
                     onChange={(e) => updateField(field.id, { name: e.target.value })}
                     placeholder="field_name"
+                    aria-label="Field name"
                     className="font-mono text-xs flex-1 min-w-0 rounded-sm"
                   />
 
                   <TypeSelect
                     value={field.type}
                     options={TOP_LEVEL_OPTIONS}
+                    ariaLabel={field.name ? `Type for ${field.name}` : "Field type"}
                     onChange={(t) => updateField(field.id, { type: t })}
                   />
 
@@ -193,6 +198,7 @@ export function SchemaBuilder({ value, onChange }: SchemaBuilderProps) {
                     variant="ghost"
                     size="icon"
                     onClick={() => removeField(field.id)}
+                    aria-label={field.name ? `Remove field ${field.name}` : "Remove field"}
                     className="shrink-0 text-muted-foreground hover:text-destructive"
                   >
                     <X className="size-3.5" />
@@ -210,12 +216,14 @@ export function SchemaBuilder({ value, onChange }: SchemaBuilderProps) {
                             updateSubField(field.id, sub.id, { name: e.target.value })
                           }
                           placeholder="sub_field"
+                          aria-label={field.name ? `Sub-field name for ${field.name}` : "Sub-field name"}
                           className="font-mono text-[11px] flex-1 min-w-0 rounded-sm"
                         />
 
                         <TypeSelect
                           value={sub.type}
                           options={SUB_FIELD_OPTIONS}
+                          ariaLabel={sub.name ? `Type for ${sub.name}` : "Sub-field type"}
                           onChange={(t) => updateSubField(field.id, sub.id, { type: t })}
                         />
 
@@ -224,6 +232,7 @@ export function SchemaBuilder({ value, onChange }: SchemaBuilderProps) {
                           variant="ghost"
                           size="icon"
                           onClick={() => removeSubField(field.id, sub.id)}
+                          aria-label={sub.name ? `Remove sub-field ${sub.name}` : "Remove sub-field"}
                           className="shrink-0 text-muted-foreground hover:text-destructive"
                         >
                           <X className="size-3.5" />

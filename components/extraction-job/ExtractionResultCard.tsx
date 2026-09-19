@@ -143,6 +143,7 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
   const [content, setContent] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const contentId = `result-input-content-${result.id}`;
 
   async function handleToggle() {
     if (expanded) {
@@ -258,8 +259,11 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
         </div>
 
         <button
+          type="button"
           onClick={handleToggle}
-          className="font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+          aria-expanded={expanded}
+          aria-controls={contentId}
+          className="font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm"
         >
           {loading ? (
             <span className="flex items-center gap-1">
@@ -278,7 +282,7 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
 
       {/* ── Raw content window ───────────────────────────────────────────── */}
       {expanded && content !== null && (
-        <ScrollArea className="h-48 rounded-sm border border-border bg-muted/30">
+        <ScrollArea id={contentId} className="h-48 rounded-sm border border-border bg-muted/30">
           <pre className="font-mono text-[10px] text-foreground p-2 whitespace-pre-wrap break-all">
             {content}
           </pre>

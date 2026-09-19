@@ -12,8 +12,11 @@ export function InstructionCard({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`w-full text-left p-4 border rounded-sm transition-all cursor-pointer ${
+      aria-current={isSelected ? "true" : undefined}
+      aria-label={`Open instruction ${instruction.title}`}
+      className={`w-full text-left p-4 border rounded-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
         isSelected
           ? "border-blue-500/40 bg-blue-500/5"
           : "border-border bg-card hover:border-blue-500/30"

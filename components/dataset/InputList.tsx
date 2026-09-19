@@ -132,6 +132,7 @@ export function InputList({
               disabled={page <= 1}
               onClick={() => handlePageChange(page - 1)}
               className="size-9 p-0"
+              aria-label="Go to previous input page"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </Button>
@@ -141,6 +142,7 @@ export function InputList({
               disabled={page >= pagination.totalPages}
               onClick={() => handlePageChange(page + 1)}
               className="size-9 p-0"
+              aria-label="Go to next input page"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </Button>

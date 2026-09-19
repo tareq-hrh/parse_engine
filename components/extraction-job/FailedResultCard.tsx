@@ -17,6 +17,8 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
   const [content, setContent] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
+  const errorId = `failed-result-error-${result.id}`;
+  const contentId = `failed-result-content-${result.id}`;
 
   async function handleContentToggle() {
     if (contentExpanded) {
@@ -60,15 +62,21 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
         <div className="flex items-center gap-3">
           {result.errorMessage && (
             <button
+              type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="text-red-400 hover:text-red-400 transition-colors cursor-pointer"
+              aria-expanded={expanded}
+              aria-controls={errorId}
+              className="text-red-400 hover:text-red-400 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm"
             >
               {expanded ? "Hide error" : "Show error"}
             </button>
           )}
           <button
+            type="button"
             onClick={handleContentToggle}
-            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            aria-expanded={contentExpanded}
+            aria-controls={contentId}
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm"
           >
             {contentLoading ? (
               <span className="flex items-center gap-1">
@@ -91,7 +99,7 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
       <UsageMetricsDisclosure metrics={result.usageMetrics} />
 
       {expanded && result.errorMessage && (
-        <ScrollArea className="h-48 rounded border border-red-500/30 bg-red-500/20">
+        <ScrollArea id={errorId} className="h-48 rounded border border-red-500/30 bg-red-500/20">
           <pre className="font-mono text-[10px] text-red-700 p-2 whitespace-pre-wrap break-all">
             {(() => {
               try {
@@ -105,7 +113,7 @@ export function FailedResultCard({ result }: { result: ExtractionResult }) {
       )}
 
       {contentExpanded && content !== null && (
-        <ScrollArea className="h-48 rounded-sm border border-border bg-muted/30">
+        <ScrollArea id={contentId} className="h-48 rounded-sm border border-border bg-muted/30">
           <pre className="font-mono text-[10px] text-foreground p-2 whitespace-pre-wrap break-all">
             {content}
           </pre>

@@ -429,10 +429,12 @@ export default function Home() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    type="button"
                     onClick={checkOllama}
                     variant="ghost"
                     size="icon"
                     className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
+                    aria-label="Refresh Ollama status"
                   >
                     <RefreshCcw className="size-3" />
                   </Button>

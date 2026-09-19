@@ -246,6 +246,7 @@ export function CreateExtractionJobForm({
                 onValueChange={(name) =>
                   setSelectedModel(models.find((m) => m.name === name) ?? null)
                 }
+                aria-label="Ollama model"
                 className="space-y-1.5"
               >
                 {models.map((model) => (
@@ -296,6 +297,7 @@ export function CreateExtractionJobForm({
                 options={TEMPERATURE_STEPS}
                 value={temperature}
                 onChange={setTemperature}
+                ariaLabel="Temperature"
                 formatLabel={(v) => v.toFixed(1)}
               />
               <div className="flex justify-between font-mono text-[10px] text-muted-foreground">
@@ -314,6 +316,7 @@ export function CreateExtractionJobForm({
                 options={NUM_CTX_OPTIONS}
                 value={numCtx}
                 onChange={setNumCtx}
+                ariaLabel="Context window"
                 formatLabel={formatNumCtx}
               />
               <p className="font-mono text-[10px] text-muted-foreground">
@@ -329,7 +332,12 @@ export function CreateExtractionJobForm({
                   Thinking Mode
                 </Label>
                 {selectedModel.thinkType === "boolean" ? (
-                  <RadioGroup value={think} onValueChange={setThink} className="flex gap-2">
+                  <RadioGroup
+                    value={think}
+                    onValueChange={setThink}
+                    aria-label="Thinking mode"
+                    className="flex gap-2"
+                  >
                     {["false", "true"].map((val) => (
                       <Label
                         key={val}
@@ -346,7 +354,12 @@ export function CreateExtractionJobForm({
                     ))}
                   </RadioGroup>
                 ) : (
-                  <RadioGroup value={think} onValueChange={setThink} className="flex gap-2">
+                  <RadioGroup
+                    value={think}
+                    onValueChange={setThink}
+                    aria-label="Thinking level"
+                    className="flex gap-2"
+                  >
                     {["low", "medium", "high"].map((level) => (
                       <Label
                         key={level}
@@ -392,6 +405,7 @@ export function CreateExtractionJobForm({
               <RadioGroup
                 value={selectedDatasetId}
                 onValueChange={setSelectedDatasetId}
+                aria-label="Dataset"
                 className="space-y-1.5"
               >
                 {datasets.map((ds) => (
@@ -438,6 +452,7 @@ export function CreateExtractionJobForm({
               <RadioGroup
                 value={selectedInstructionId}
                 onValueChange={setSelectedInstructionId}
+                aria-label="Instruction"
                 className="space-y-1.5"
               >
                 {instructions.map((inst) => (

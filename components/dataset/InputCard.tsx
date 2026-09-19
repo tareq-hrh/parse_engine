@@ -39,6 +39,7 @@ export function InputCard({
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const contentId = `dataset-input-content-${input.id}`;
 
   async function handleToggle() {
     if (expanded) {
@@ -173,8 +174,11 @@ export function InputCard({
 
       {/* ── Toggle button ───────────────────────────────────────────────── */}
       <button
+        type="button"
         onClick={handleToggle}
-        className="font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        className="font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm"
       >
         {loading ? (
           <span className="flex items-center gap-1">
@@ -190,7 +194,10 @@ export function InputCard({
 
       {/* ── Content window ──────────────────────────────────────────────── */}
       {expanded && content !== null && (
-        <ScrollArea className="h-48 overflow-y-auto font-mono text-[10px] text-foreground bg-muted/30 border border-border rounded-sm p-2 whitespace-pre-wrap break-all">
+        <ScrollArea
+          id={contentId}
+          className="h-48 overflow-y-auto font-mono text-[10px] text-foreground bg-muted/30 border border-border rounded-sm p-2 whitespace-pre-wrap break-all"
+        >
           {content}
         </ScrollArea>
       )}

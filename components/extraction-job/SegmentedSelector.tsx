@@ -6,11 +6,13 @@ export function SegmentedSelector<T extends string | number | null>({
   options,
   value,
   onChange,
+  ariaLabel,
   formatLabel,
 }: {
   options: T[];
   value: T;
   onChange: (val: T) => void;
+  ariaLabel: string;
   formatLabel?: (val: T) => string;
 }) {
   // RadioGroup requires string values — we stringify for the group and
@@ -27,6 +29,7 @@ export function SegmentedSelector<T extends string | number | null>({
       <RadioGroup
         value={toStr(value)}
         onValueChange={(s) => onChange(fromStr(s))}
+        aria-label={ariaLabel}
         className="relative flex min-w-[24rem] items-center justify-between"
       >
         {/* ── Connecting track line ─────────────────────────────────────── */}

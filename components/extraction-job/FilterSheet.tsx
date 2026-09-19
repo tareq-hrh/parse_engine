@@ -61,8 +61,9 @@ export function FilterSheet({
               </span>
               <span>·</span>
               <button
+                type="button"
                 onClick={onClearAll}
-                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer underline underline-offset-2"
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm"
               >
                 Clear all
               </button>
@@ -133,6 +134,7 @@ export function FilterSheet({
                           value={rawQuery}
                           onChange={(e) => handleSearchChange(facet.key, e.target.value)}
                           placeholder="Search values..."
+                          aria-label={`Search ${displayKey(facet.key)} values`}
                           className="pl-6 pr-16 text-[10px] placeholder:text-[10px] font-mono rounded-sm border-muted-foreground/20"
                         />
                       </div>
@@ -152,9 +154,14 @@ export function FilterSheet({
                           const isChecked = selectedValues.includes(value);
                           return (
                             <button
+                              type="button"
                               key={value}
                               onClick={() => onToggleValue(facet.key, value)}
-                              className={`w-full flex items-center gap-2 overflow-hidden px-2 py-1 rounded-sm text-left transition-colors cursor-pointer ${
+                              aria-pressed={isChecked}
+                              aria-label={`${isChecked ? "Remove" : "Apply"} filter ${displayKey(
+                                facet.key,
+                              )}: ${displayValue(value)}`}
+                              className={`w-full flex items-center gap-2 overflow-hidden px-2 py-1 rounded-sm text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
                                 isChecked
                                   ? "bg-blue-500/10 text-foreground"
                                   : "hover:bg-muted/60 text-muted-foreground hover:text-foreground"

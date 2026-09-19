@@ -389,7 +389,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <header className="border-b border-border px-3 py-3 sm:px-6 sm:py-4 flex items-center justify-between shrink-0">
+      <header className="border-b border-border bg-surface-panel-header px-3 py-3 sm:px-6 sm:py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Logo className="size-7 fill-blue-500" />

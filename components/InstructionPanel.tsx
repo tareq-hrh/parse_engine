@@ -136,7 +136,7 @@ export function InstructionPanel() {
               className="font-mono text-xs gap-1.5 bg-green-600 hover:bg-green-500 text-white"
             >
               <Plus className="w-3.5 h-3.5" />
-              New<span className="hidden sm:inline"> Instruction</span>
+              New
             </Button>
             <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
               {instructions.length} {instructions.length === 1 ? "Instruction" : "Instructions"}

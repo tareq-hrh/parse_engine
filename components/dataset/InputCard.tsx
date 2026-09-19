@@ -87,7 +87,7 @@ export function InputCard({
   }
 
   return (
-    <div className="border border-border rounded-sm bg-background p-2.5 space-y-2">
+    <div className="border border-border rounded-sm bg-surface-raised p-2.5 space-y-2">
       {/* ── Header row ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-xs text-foreground truncate flex-1">{input.label}</span>

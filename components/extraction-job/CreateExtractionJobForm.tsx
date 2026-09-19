@@ -176,7 +176,7 @@ export function CreateExtractionJobForm({
 
   return (
     <>
-      <div className="flex shrink-0 flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-surface-panel-header p-5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-mono text-base font-semibold text-foreground">New Extraction Job</h2>
         <div className="flex gap-2 sm:justify-end">
           <Button

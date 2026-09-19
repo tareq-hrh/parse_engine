@@ -20,18 +20,23 @@ export function WorkspacePanelShell({
 }) {
   return (
     <div className="grid h-full min-h-0 gap-3 md:grid-cols-[minmax(14rem,20%)_minmax(0,1fr)]">
-      <div className={cn("min-h-0 flex-col gap-2", showDetail ? "hidden md:flex" : "flex")}>
+      <div
+        className={cn(
+          "min-h-0 flex-col gap-2 rounded-sm border border-border/80 bg-surface-rail p-2",
+          showDetail ? "hidden md:flex" : "flex",
+        )}
+      >
         {list}
       </div>
 
       <div
         className={cn(
-          "min-h-0 flex-col overflow-hidden rounded-sm border border-border bg-card",
+          "min-h-0 flex-col overflow-hidden rounded-sm border border-border/80 bg-surface-panel shadow-sm",
           showDetail ? "flex" : "hidden md:flex",
         )}
       >
         {showDetail && (
-          <div className="shrink-0 border-b border-border bg-background/60 px-3 py-2 md:hidden">
+          <div className="shrink-0 border-b border-border bg-surface-panel-header px-3 py-2 md:hidden">
             <Button
               type="button"
               variant="ghost"

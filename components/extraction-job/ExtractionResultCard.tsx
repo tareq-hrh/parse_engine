@@ -174,7 +174,7 @@ export function ExtractionResultCard({ result }: { result: ExtractionResult }) {
   });
 
   return (
-    <div className="border border-border bg-background rounded-lg p-3 space-y-2">
+    <div className="border border-border bg-surface-raised rounded-lg p-3 space-y-2">
       {/* ── Header row: timestamp ───────────────────────────────────────── */}
       <div className="flex items-center justify-start">
         <p className="font-mono text-xs text-muted-foreground/80 shrink-0">

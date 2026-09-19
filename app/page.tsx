@@ -278,6 +278,12 @@ export default function Home() {
     setSuccessfulResults([]);
     setFailedResults([]);
   }, []);
+
+  const handleClearedJobSelection = useCallback(() => {
+    viewedJobIdRef.current = null;
+    setSuccessfulResults([]);
+    setFailedResults([]);
+  }, []);
   // ── Initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
     const initFetchJobs = async () => {
@@ -383,7 +389,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <header className="border-b border-border px-6 py-4 flex items-center justify-between shrink-0">
+      <header className="border-b border-border px-3 py-3 sm:px-6 sm:py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Logo className="size-7 fill-blue-500" />
@@ -442,29 +448,31 @@ export default function Home() {
       <RunningBanner runningJob={runningJob} onStop={handleStop} stopping={stopping} />
 
       {/* ── Main Content ──────────────────────────────────────────────────── */}
-      <main className="flex-1 px-6 pt-6 pb-20 overflow-hidden">
+      <main className="flex-1 min-h-0 px-3 pt-4 pb-6 sm:px-6 sm:pt-6 sm:pb-20 overflow-hidden">
         <Tabs defaultValue="extraction-jobs" className="h-full flex flex-col">
           {/* Tab Navigation */}
-          <TabsList className="mb-6 shrink-0 w-full">
+          <TabsList className="mb-4 sm:mb-6 shrink-0 grid h-auto w-full grid-cols-3">
             <TabsTrigger
               value="extraction-jobs"
-              className="gap-2 font-mono text-sm uppercase tracking-wider data-[state=active]:text-blue-400"
+              className="gap-1 font-mono text-[11px] uppercase tracking-normal sm:gap-2 sm:text-sm sm:tracking-wider data-[state=active]:text-blue-400"
             >
-              <Cpu className="w-5 h-5" />
-              Extraction Jobs
+              <Cpu className="size-4 sm:size-5" />
+              <span className="sm:hidden">Jobs</span>
+              <span className="hidden sm:inline">Extraction Jobs</span>
             </TabsTrigger>
             <TabsTrigger
               value="datasets"
-              className="gap-2 font-mono text-sm uppercase tracking-wider data-[state=active]:text-blue-400"
+              className="gap-1 font-mono text-[11px] uppercase tracking-normal sm:gap-2 sm:text-sm sm:tracking-wider data-[state=active]:text-blue-400"
             >
-              <Database className="w-5 h-5" />
-              Datasets
+              <Database className="size-4 sm:size-5" />
+              <span className="sm:hidden">Data</span>
+              <span className="hidden sm:inline">Datasets</span>
             </TabsTrigger>
             <TabsTrigger
               value="instructions"
-              className="gap-2 font-mono text-sm uppercase tracking-wider data-[state=active]:text-blue-400"
+              className="gap-1 font-mono text-[11px] uppercase tracking-normal sm:gap-2 sm:text-sm sm:tracking-wider data-[state=active]:text-blue-400"
             >
-              <FileText className="w-5 h-5" />
+              <FileText className="size-4 sm:size-5" />
               Instructions
             </TabsTrigger>
           </TabsList>
@@ -481,6 +489,7 @@ export default function Home() {
               onSelectJob={handleSelectJob}
               onStarted={handleStarted}
               onDeletedJob={handleDeletedJob}
+              onClearedSelection={handleClearedJobSelection}
             />
           </TabsContent>
 

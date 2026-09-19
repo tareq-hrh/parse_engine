@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
+import { WorkspacePanelShell } from "@/components/WorkspacePanelShell";
 import { Plus, Loader2 } from "lucide-react";
 import { ExtractionJob, ExtractionResult, RightPanelMode } from "./extraction-job/types";
 import { ExtractionJobCard } from "./extraction-job/ExtractionJobCard";
@@ -32,6 +33,7 @@ interface ExtractionJobPanelProps {
   onSelectJob: (id: string) => Promise<void>; // triggers snapshot fetch + viewedJobId tracking
   onStarted: (jobId: string) => void;         // triggers SSE stream open after successful start
   onDeletedJob: (id: string) => void;
+  onClearedSelection: () => void;
 }
 
 // ── Main ExtractionJobPanel ─────────────────────────────────────────────────────
@@ -45,6 +47,7 @@ export function ExtractionJobPanel({
   onSelectJob,
   onStarted,
   onDeletedJob,
+  onClearedSelection,
 }: ExtractionJobPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<RightPanelMode>("empty");
@@ -56,6 +59,12 @@ export function ExtractionJobPanel({
     setSelectedId(id);
     setMode("view");
     await onSelectJob(id);
+  }
+
+  function handleBackToList() {
+    setSelectedId(null);
+    setMode("empty");
+    onClearedSelection();
   }
 
   function handleOpenCreate() {
@@ -177,74 +186,78 @@ export function ExtractionJobPanel({
   });
 
   return (
-    <div className="flex gap-3 h-full">
-      {/* ── Left Panel — 20% ────────────────────────────────────────────────── */}
-      <div className="w-1/5 flex flex-col gap-2 min-w-0">
-        <div className="flex items-center justify-between shrink-0">
-          <Button
-            size="sm"
-            onClick={handleOpenCreate}
-            className="font-mono text-xs gap-1.5 bg-green-600 hover:bg-green-500 text-white"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New
-          </Button>
-          <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-            {jobs.length} {jobs.length === 1 ? "Extraction Job" : "Extraction Jobs"}
-          </span>
-        </div>
-
-        <ScrollArea className="flex-1">
-          <div className="space-y-2">
-            {jobsLoading && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            {!jobsLoading && jobs.length === 0 && (
-              <p className="text-center text-xs text-muted-foreground font-mono py-8">
-                No extraction jobs yet.
-                <br />
-                Create your first one.
-              </p>
-            )}
-            {!jobsLoading &&
-              sortedJobs.map((job) => (
-                <ExtractionJobCard
-                  key={job.id}
-                  job={job}
-                  isSelected={selectedId === job.id}
-                  onClick={() => handleSelectJob(job.id)}
-                />
-              ))}
+    <WorkspacePanelShell
+      showDetail={mode !== "empty"}
+      backLabel="Extraction Jobs"
+      onBack={handleBackToList}
+      list={
+        <>
+          <div className="flex items-center justify-between shrink-0">
+            <Button
+              size="sm"
+              onClick={handleOpenCreate}
+              className="font-mono text-xs gap-1.5 bg-green-600 hover:bg-green-500 text-white"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New
+            </Button>
+            <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+              {jobs.length} {jobs.length === 1 ? "Extraction Job" : "Extraction Jobs"}
+            </span>
           </div>
-        </ScrollArea>
-      </div>
 
-      {/* ── Right Panel — 80% ───────────────────────────────────────────────── */}
-      <div className="flex-1 border border-border rounded-sm bg-card flex flex-col overflow-hidden min-w-0">
-        {mode === "empty" && <EmptyState />}
+          <ScrollArea className="flex-1">
+            <div className="space-y-2">
+              {jobsLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {!jobsLoading && jobs.length === 0 && (
+                <p className="text-center text-xs text-muted-foreground font-mono py-8">
+                  No extraction jobs yet.
+                  <br />
+                  Create your first one.
+                </p>
+              )}
+              {!jobsLoading &&
+                sortedJobs.map((job) => (
+                  <ExtractionJobCard
+                    key={job.id}
+                    job={job}
+                    isSelected={selectedId === job.id}
+                    onClick={() => handleSelectJob(job.id)}
+                  />
+                ))}
+            </div>
+          </ScrollArea>
+        </>
+      }
+      detail={
+        <>
+          {mode === "empty" && <EmptyState />}
 
-        {mode === "view" && selectedJob && (
-          <ExtractionJobDetails
-            key={selectedJob.id}
-            job={selectedJob}
-            successfulResults={successfulResults}
-            failedResults={failedResults}
-            hasRunningJob={hasRunningJob}
-            actionLoading={actionLoading}
-            onStart={handleStart}
-            retryFailedLoading={retryFailedLoading}
-            onRetryFailed={handleRetryFailed}
-            deleteLoading={deleteLoading}
-            onDeleteJob={handleDeleteJob}
-          />
-        )}
+          {mode === "view" && selectedJob && (
+            <ExtractionJobDetails
+              key={selectedJob.id}
+              job={selectedJob}
+              successfulResults={successfulResults}
+              failedResults={failedResults}
+              hasRunningJob={hasRunningJob}
+              actionLoading={actionLoading}
+              onStart={handleStart}
+              retryFailedLoading={retryFailedLoading}
+              onRetryFailed={handleRetryFailed}
+              deleteLoading={deleteLoading}
+              onDeleteJob={handleDeleteJob}
+            />
+          )}
 
-        {mode === "create" && (
-          <CreateExtractionJobForm onCreated={handleCreated} onCancel={handleCancelCreate} />
-        )}
-      </div>
-    </div>
+          {mode === "create" && (
+            <CreateExtractionJobForm onCreated={handleCreated} onCancel={handleCancelCreate} />
+          )}
+        </>
+      }
+    />
   );
 }

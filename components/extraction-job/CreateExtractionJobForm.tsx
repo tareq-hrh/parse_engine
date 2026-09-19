@@ -261,8 +261,12 @@ export function CreateExtractionJobForm({
                       htmlFor={`model-${model.name}`}
                       className="flex items-center gap-3 p-2.5 border rounded-lg min-w-0 font-mono text-sm text-foreground cursor-pointer"
                     >
-                      <RadioGroupItem value={model.name} id={`model-${model.name}`} />
-                      {model.name}
+                      <RadioGroupItem
+                        value={model.name}
+                        id={`model-${model.name}`}
+                        className="shrink-0"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{model.name}</span>
                       {model.supportsThinking && (
                         <span className="flex items-center gap-0.5 font-mono text-[10px] text-violet-400 border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 rounded shrink-0">
                           <Brain className="size-2.5" />
@@ -446,8 +450,8 @@ export function CreateExtractionJobForm({
                         : "border-border bg-card hover:border-blue-500/30"
                     }`}
                   >
-                    <RadioGroupItem value={inst.id} id={`instruction-${inst.id}`} />
-                    {inst.title}
+                    <RadioGroupItem value={inst.id} id={`instruction-${inst.id}`} className="shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{inst.title}</span>
                   </Label>
                 ))}
               </RadioGroup>

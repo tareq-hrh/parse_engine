@@ -166,8 +166,8 @@ export function SchemaBuilder({ value, onChange }: SchemaBuilderProps) {
 
   // ── render ──
   return (
-    <div className="flex gap-2">
-      <div className="space-y-2 w-[50%]">
+    <div className="flex flex-col gap-2 lg:flex-row">
+      <div className="space-y-2 w-full lg:w-[50%]">
         {/* Field rows */}
         {value.length > 0 && (
           <div className="space-y-1.5 rounded-md border border-border bg-muted/20 p-3">
@@ -263,7 +263,7 @@ export function SchemaBuilder({ value, onChange }: SchemaBuilderProps) {
 
       {/* Simplified preview — code-window style */}
       {preview && (
-        <div className="flex-1 rounded-md border border-border overflow-hidden flex flex-col">
+        <div className="min-h-48 flex-1 rounded-md border border-border overflow-hidden flex flex-col">
           {/* Title bar */}
           <div className="bg-muted/60 border-b border-border px-3 py-2 flex items-center gap-2 shrink-0">
             <span className="size-2.5 rounded-full bg-red-400/70" />

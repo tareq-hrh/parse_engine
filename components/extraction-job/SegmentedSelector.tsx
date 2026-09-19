@@ -25,7 +25,7 @@ export function SegmentedSelector<T extends string | number | null>({
   };
 
   return (
-    <div className="overflow-x-auto pb-1">
+    <div className="overflow-x-auto pb-2">
       <RadioGroup
         value={toStr(value)}
         onValueChange={(s) => onChange(fromStr(s))}

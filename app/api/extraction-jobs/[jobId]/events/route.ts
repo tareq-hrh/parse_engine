@@ -70,27 +70,54 @@ export async function GET(
         try {
           const job = await prisma.extractionJob.findUnique({ where: { id: jobId } });
 
-          if (!job || job.finishedAt != null) {
-            const [successfulResultCount, failedResultCount] = await Promise.all([
-              prisma.extractionResult.count({ where: { extractionJobId: jobId, status: "success" } }),
-              prisma.extractionResult.count({ where: { extractionJobId: jobId, status: "failed" } }),
-            ]);
+          if (!job) {
             handler({
               type: "completed",
-              successfulResultCount,
-              failedResultCount,
-              totalProcessingTimeSeconds: job?.totalProcessingTimeSeconds ?? 0,
+              jobPatch: {
+                isRunning: false,
+                successfulResultCount: 0,
+                failedResultCount: 0,
+                totalInputCount: 0,
+                totalProcessingTimeSeconds: 0,
+                currentInputLabel: null,
+              },
             });
-          } else if (job.isRunning && job.currentInputLabel) {
-            const [successfulResultCount, failedResultCount] = await Promise.all([
-              prisma.extractionResult.count({ where: { extractionJobId: jobId, status: "success" } }),
-              prisma.extractionResult.count({ where: { extractionJobId: jobId, status: "failed" } }),
-            ]);
+            return;
+          }
+
+          const [successfulResultCount, failedResultCount, totalInputCount] = await Promise.all([
+            prisma.extractionResult.count({ where: { extractionJobId: jobId, status: "success" } }),
+            prisma.extractionResult.count({ where: { extractionJobId: jobId, status: "failed" } }),
+            prisma.datasetInput.count({ where: { datasetId: job.datasetId } }),
+          ]);
+
+          if (job.finishedAt != null) {
             handler({
-              type: "processing",
-              currentInputLabel: job.currentInputLabel,
-              successfulResultCount,
-              failedResultCount,
+              type: "completed",
+              jobPatch: {
+                isRunning: false,
+                startedAt: job.startedAt?.toISOString() ?? null,
+                finishedAt: job.finishedAt.toISOString(),
+                currentInputLabel: null,
+                successfulResultCount,
+                failedResultCount,
+                totalInputCount,
+                totalProcessingTimeSeconds: job.totalProcessingTimeSeconds,
+              },
+            });
+          } else if (job.isRunning) {
+            handler({
+              type: job.currentInputLabel ? "processing" : "started",
+              jobPatch: {
+                isRunning: true,
+                startedAt: job.startedAt?.toISOString() ?? null,
+                finishedAt: null,
+                currentInputLabel: job.currentInputLabel,
+                successfulResultCount,
+                failedResultCount,
+                totalInputCount,
+                totalProcessingTimeSeconds: job.totalProcessingTimeSeconds,
+              },
             });
           }
         } catch {

@@ -24,6 +24,10 @@ import {
   shouldStopExtractionJob,
 } from "./extractionJobRuntimeState";
 
+function toIsoString(date: Date | null | undefined): string | null {
+  return date ? date.toISOString() : null;
+}
+
 /**
  * Main runner function.
  * Call this from the API route — it runs in the background (no await needed).
@@ -110,7 +114,19 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
   failedResultCount = initialFailedResultCount;
 
   // ── Emit "started" ─────────────────────────────────────────────────────────
-  emitExtractionJobEvent(extractionJobId, { type: "started", totalInputCount: datasetInputs.length });
+  emitExtractionJobEvent(extractionJobId, {
+    type: "started",
+    jobPatch: {
+      isRunning: true,
+      startedAt: toIsoString(job.startedAt),
+      finishedAt: null,
+      totalProcessingTimeSeconds: previousProcessingTimeSeconds,
+      successfulResultCount,
+      failedResultCount,
+      totalInputCount: datasetInputs.length,
+      currentInputLabel: null,
+    },
+  });
 
   // ── Reconstruct modelOptions from flat columns ─────────────────────────────
   const modelOptions = {
@@ -168,8 +184,11 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
       emitExtractionJobEvent(extractionJobId, {
         type: "input_skipped",
         label: input.label,
-        successfulResultCount,
-        failedResultCount,
+        jobPatch: {
+          successfulResultCount,
+          failedResultCount,
+          totalInputCount: datasetInputs.length,
+        },
       });
       continue;
     }
@@ -190,9 +209,12 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
     // ── Emit "processing" (AFTER save so DB is consistent) ────────────────────
     emitExtractionJobEvent(extractionJobId, {
       type: "processing",
-      currentInputLabel: input.label,
-      successfulResultCount,
-      failedResultCount,
+      jobPatch: {
+        currentInputLabel: input.label,
+        successfulResultCount,
+        failedResultCount,
+        totalInputCount: datasetInputs.length,
+      },
     });
 
     // ── Build renderedPrompt ───────────────────────────────────────────────────────
@@ -251,6 +273,14 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
       // ── Emit "input_success" ───────────────────────────────────────────────
       emitExtractionJobEvent(extractionJobId, {
         type: "input_success",
+        jobPatch: {
+          successfulResultCount,
+          failedResultCount,
+          totalInputCount: datasetInputs.length,
+          lastSuccessfulInputLabel: input.label,
+          currentInputLabel: null,
+          totalProcessingTimeSeconds: updatedTotalProcessingTimeSeconds,
+        },
         result: {
           id: created.id,
           inputLabel: input.label,
@@ -265,9 +295,6 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
           createdAt: processedAt.toISOString(),
           usageMetrics: usageMetrics ?? null,
         },
-        successfulResultCount,
-        failedResultCount,
-        lastSuccessfulInputLabel: input.label,
       });
 
       console.log(`✅ Done: ${input.label} (${processingDurationSeconds}s)`);
@@ -348,6 +375,13 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
       // ── Emit "input_failed" ────────────────────────────────────────────────
       emitExtractionJobEvent(extractionJobId, {
         type: "input_failed",
+        jobPatch: {
+          successfulResultCount,
+          failedResultCount,
+          totalInputCount: datasetInputs.length,
+          currentInputLabel: null,
+          totalProcessingTimeSeconds: updatedTotalProcessingTimeSeconds,
+        },
         result: {
           id: created.id,
           inputLabel: input.label,
@@ -362,8 +396,6 @@ export async function runExtractionJob(extractionJobId: string): Promise<void> {
           createdAt: processedAt.toISOString(),
           usageMetrics: null,
         },
-        successfulResultCount,
-        failedResultCount,
       });
     } finally {
       clearExtractionJobAbortController(extractionJobId, controller);
@@ -409,12 +441,13 @@ async function finishExtractionJob(
   reason: "completed" | "stopped",
 ): Promise<void> {
   const totalProcessingTimeSeconds = previousProcessingTimeSeconds + Math.round((Date.now() - sessionStartedAtMs) / 1000);
+  const finishedAt = new Date();
 
   await prisma.extractionJob.update({
     where: { id: extractionJobId },
     data: {
       isRunning: false,
-      finishedAt: new Date(),
+      finishedAt,
       currentInputLabel: null,
       totalProcessingTimeSeconds,
     },
@@ -422,9 +455,14 @@ async function finishExtractionJob(
 
   emitExtractionJobEvent(extractionJobId, {
     type: reason,
-    successfulResultCount,
-    failedResultCount,
-    totalProcessingTimeSeconds,
+    jobPatch: {
+      isRunning: false,
+      finishedAt: finishedAt.toISOString(),
+      currentInputLabel: null,
+      successfulResultCount,
+      failedResultCount,
+      totalProcessingTimeSeconds,
+    },
   });
 
   console.log(`📌 Extraction job finished (${reason}): ${title}. Total time: ${totalProcessingTimeSeconds}s`);
@@ -440,12 +478,13 @@ async function stopCrashedExtractionJob(
 ): Promise<void> {
   const totalProcessingTimeSeconds =
     previousProcessingTimeSeconds + Math.round((Date.now() - sessionStartedAtMs) / 1000);
+  const finishedAt = new Date();
 
   await prisma.extractionJob.updateMany({
     where: { id: extractionJobId },
     data: {
       isRunning: false,
-      finishedAt: new Date(),
+      finishedAt,
       currentInputLabel: null,
       totalProcessingTimeSeconds,
     },
@@ -453,9 +492,14 @@ async function stopCrashedExtractionJob(
 
   emitExtractionJobEvent(extractionJobId, {
     type: "stopped",
-    successfulResultCount,
-    failedResultCount,
-    totalProcessingTimeSeconds,
+    jobPatch: {
+      isRunning: false,
+      finishedAt: finishedAt.toISOString(),
+      currentInputLabel: null,
+      successfulResultCount,
+      failedResultCount,
+      totalProcessingTimeSeconds,
+    },
   });
 
   console.log(`📌 Extraction job finished (stopped after crash): ${title}. Total time: ${totalProcessingTimeSeconds}s`);

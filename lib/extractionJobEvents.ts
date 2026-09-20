@@ -7,7 +7,7 @@
  */
 
 import { EventEmitter } from "events";
-import { ExtractedData, UsageMetrics } from "@/components/extraction-job/types";
+import type { ExtractionJob, ExtractedData, UsageMetrics } from "@/components/extraction-job/types";
 
 // ── Payload for an extraction result sent over SSE ─────────────────────────
 // Matches ExtractionResult from components/extraction-job/types.ts so it can be
@@ -28,45 +28,50 @@ export interface ExtractionResultEventPayload {
   usageMetrics: UsageMetrics | null;
 }
 
+export type ExtractionJobEventJobPatch = Partial<
+  Pick<
+    ExtractionJob,
+    | "isRunning"
+    | "startedAt"
+    | "finishedAt"
+    | "totalProcessingTimeSeconds"
+    | "successfulResultCount"
+    | "failedResultCount"
+    | "totalInputCount"
+    | "lastSuccessfulInputLabel"
+    | "currentInputLabel"
+  >
+>;
+
 // ── Discriminated union of all event types ────────────────────────────────────
 export type ExtractionJobEvent =
-  | { type: "started"; totalInputCount: number }
+  | { type: "started"; jobPatch: ExtractionJobEventJobPatch }
   | {
       type: "processing";
-      currentInputLabel: string;
-      successfulResultCount: number;
-      failedResultCount: number;
+      jobPatch: ExtractionJobEventJobPatch;
     }
   | {
       type: "input_success";
+      jobPatch: ExtractionJobEventJobPatch;
       result: ExtractionResultEventPayload;
-      successfulResultCount: number;
-      failedResultCount: number;
-      lastSuccessfulInputLabel: string;
     }
   | {
       type: "input_failed";
+      jobPatch: ExtractionJobEventJobPatch;
       result: ExtractionResultEventPayload;
-      successfulResultCount: number;
-      failedResultCount: number;
     }
   | {
       type: "input_skipped";
       label: string;
-      successfulResultCount: number;
-      failedResultCount: number;
+      jobPatch: ExtractionJobEventJobPatch;
     }
   | {
       type: "stopped";
-      successfulResultCount: number;
-      failedResultCount: number;
-      totalProcessingTimeSeconds: number;
+      jobPatch: ExtractionJobEventJobPatch;
     }
   | {
       type: "completed";
-      successfulResultCount: number;
-      failedResultCount: number;
-      totalProcessingTimeSeconds: number;
+      jobPatch: ExtractionJobEventJobPatch;
     }
   | { type: "heartbeat" };
 

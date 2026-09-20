@@ -30,7 +30,7 @@ import {
   useDeleteExtractionResultMutation,
   useStopExtractionJobMutation,
 } from "@/components/extraction-job/useExtractionJobMutations";
-import type { ExtractionJobEvent } from "@/lib/extractionJobEvents";
+import type { ExtractionJobEvent, ExtractionJobEventJobPatch } from "@/lib/extractionJobEvents";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/shadcn_ui/button";
 import Logo from "@/components/Logo";
@@ -92,6 +92,25 @@ export default function Home() {
       );
     },
     [queryClient],
+  );
+
+  const patchJobCaches = useCallback(
+    (jobId: string, jobPatch: ExtractionJobEventJobPatch) => {
+      updateJobs((prev) =>
+        prev.map((job) => (job.id === jobId ? { ...job, ...jobPatch } : job)),
+      );
+      updateResultsSnapshot(jobId, (snapshot) => ({
+        ...snapshot,
+        successfulResultCount:
+          jobPatch.successfulResultCount ?? snapshot.successfulResultCount,
+        failedResultCount: jobPatch.failedResultCount ?? snapshot.failedResultCount,
+        job: {
+          ...snapshot.job,
+          ...jobPatch,
+        },
+      }));
+    },
+    [updateJobs, updateResultsSnapshot],
   );
 
   const refreshJobs = useCallback(async (): Promise<ExtractionJob[]> => {
@@ -169,56 +188,29 @@ export default function Home() {
 
             case "started":
               reconnectAttempt = 0;
-              // Runner confirmed started — mark the job as running in query cache
-              updateJobs((prev) =>
-                prev.map((job) => (job.id === jobId ? { ...job, isRunning: true } : job)),
-              );
+              patchJobCaches(jobId, event.jobPatch);
               break;
 
             case "processing":
               reconnectAttempt = 0;
-              updateJobs((prev) =>
-                prev.map((job) =>
-                  job.id === jobId
-                    ? {
-                        ...job,
-                        currentInputLabel: event.currentInputLabel,
-                        successfulResultCount: event.successfulResultCount,
-                        failedResultCount: event.failedResultCount,
-                      }
-                    : job,
-                ),
-              );
+              patchJobCaches(jobId, event.jobPatch);
               break;
 
             case "input_success":
               reconnectAttempt = 0;
-              updateJobs((prev) =>
-                prev.map((job) =>
-                  job.id === jobId
-                    ? {
-                        ...job,
-                        successfulResultCount: event.successfulResultCount,
-                        failedResultCount: event.failedResultCount,
-                        lastSuccessfulInputLabel: event.lastSuccessfulInputLabel,
-                        currentInputLabel: null,
-                      }
-                    : job,
-                ),
-              );
+              patchJobCaches(jobId, event.jobPatch);
               // Append the result only if the user is viewing this job
               if (viewedJobIdRef.current === jobId) {
                 const result = event.result as ExtractionResult;
                 updateResultsSnapshot(jobId, (snapshot) => ({
                   ...snapshot,
-                  successfulResultCount: event.successfulResultCount,
-                  failedResultCount: event.failedResultCount,
+                  successfulResultCount:
+                    event.jobPatch.successfulResultCount ?? snapshot.successfulResultCount,
+                  failedResultCount:
+                    event.jobPatch.failedResultCount ?? snapshot.failedResultCount,
                   job: {
                     ...snapshot.job,
-                    successfulResultCount: event.successfulResultCount,
-                    failedResultCount: event.failedResultCount,
-                    lastSuccessfulInputLabel: event.lastSuccessfulInputLabel,
-                    currentInputLabel: null,
+                    ...event.jobPatch,
                   },
                   successfulResults: prependUniqueResult(snapshot.successfulResults, result),
                 }));
@@ -227,29 +219,18 @@ export default function Home() {
 
             case "input_failed":
               reconnectAttempt = 0;
-              updateJobs((prev) =>
-                prev.map((job) =>
-                  job.id === jobId
-                    ? {
-                        ...job,
-                        successfulResultCount: event.successfulResultCount,
-                        failedResultCount: event.failedResultCount,
-                        currentInputLabel: null,
-                      }
-                    : job,
-                ),
-              );
+              patchJobCaches(jobId, event.jobPatch);
               if (viewedJobIdRef.current === jobId) {
                 const result = event.result as ExtractionResult;
                 updateResultsSnapshot(jobId, (snapshot) => ({
                   ...snapshot,
-                  successfulResultCount: event.successfulResultCount,
-                  failedResultCount: event.failedResultCount,
+                  successfulResultCount:
+                    event.jobPatch.successfulResultCount ?? snapshot.successfulResultCount,
+                  failedResultCount:
+                    event.jobPatch.failedResultCount ?? snapshot.failedResultCount,
                   job: {
                     ...snapshot.job,
-                    successfulResultCount: event.successfulResultCount,
-                    failedResultCount: event.failedResultCount,
-                    currentInputLabel: null,
+                    ...event.jobPatch,
                   },
                   failedResults: prependUniqueResult(snapshot.failedResults, result),
                 }));
@@ -258,35 +239,12 @@ export default function Home() {
 
             case "input_skipped":
               reconnectAttempt = 0;
-              updateJobs((prev) =>
-                prev.map((job) =>
-                  job.id === jobId
-                    ? {
-                        ...job,
-                        successfulResultCount: event.successfulResultCount,
-                        failedResultCount: event.failedResultCount,
-                      }
-                    : job,
-                ),
-              );
+              patchJobCaches(jobId, event.jobPatch);
               break;
 
             case "stopped":
             case "completed":
-              updateJobs((prev) =>
-                prev.map((job) =>
-                  job.id === jobId
-                    ? {
-                        ...job,
-                        isRunning: false,
-                        currentInputLabel: null,
-                        successfulResultCount: event.successfulResultCount,
-                        failedResultCount: event.failedResultCount,
-                        totalProcessingTimeSeconds: event.totalProcessingTimeSeconds,
-                      }
-                    : job,
-                ),
-              );
+              patchJobCaches(jobId, event.jobPatch);
               es.close();
               if (eventSourceRef.current === es) {
                 eventSourceRef.current = null;
@@ -338,7 +296,7 @@ export default function Home() {
 
       connect();
     },
-    [refreshJobs, refreshResultsSnapshot, updateJobs, updateResultsSnapshot],
+    [patchJobCaches, refreshJobs, refreshResultsSnapshot, updateResultsSnapshot],
   );
   // ── Called when user selects an extraction job to view ───────────────────
   const handleSelectJob = useCallback(async (id: string) => {

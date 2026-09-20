@@ -53,6 +53,9 @@ export function ExtractionJobDetails({
   job,
   successfulResults,
   failedResults,
+  resultsLoading,
+  resultsError,
+  onRetryResults,
   hasRunningJob,
   actionLoading,
   onStart,
@@ -65,6 +68,9 @@ export function ExtractionJobDetails({
   job: ExtractionJob;
   successfulResults: ExtractionResult[];
   failedResults: ExtractionResult[];
+  resultsLoading: boolean;
+  resultsError: boolean;
+  onRetryResults: () => void;
   hasRunningJob: boolean;
   actionLoading: boolean;
   onStart: () => void;
@@ -94,6 +100,7 @@ export function ExtractionJobDetails({
   const facets = useMemo(() => computeFacets(successfulResults), [successfulResults]);
 
   const activeFilterCount = Object.values(activeFilters).filter((v) => v.length > 0).length;
+  const hasAnyResults = successfulResults.length + failedResults.length > 0;
 
   // ── Filtered list — new arrivals automatically pass through the same logic ─
   const filteredSuccessfulResults = useMemo(() => {
@@ -370,8 +377,37 @@ export function ExtractionJobDetails({
           </TabsList>
 
           <TabsContent value="results" className="mt-3">
-            {successfulResults.length === 0 ? (
-              <p className="text-xs text-muted-foreground font-mono">No results yet.</p>
+            {resultsLoading ? (
+              <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground font-mono">
+                <Loader2 className="size-3.5 animate-spin" />
+                Loading results...
+              </div>
+            ) : resultsError ? (
+              <div className="space-y-2 py-3 font-mono text-xs text-muted-foreground">
+                <p>Failed to load results.</p>
+                <button
+                  type="button"
+                  onClick={onRetryResults}
+                  className="text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : successfulResults.length === 0 ? (
+              job.isRunning ? (
+                <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground font-mono">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  {hasAnyResults
+                    ? "Waiting for a successful result..."
+                    : "Waiting for the first result..."}
+                </div>
+              ) : failedResults.length > 0 ? (
+                <p className="text-xs text-muted-foreground font-mono">
+                  No successful results yet. Check the Failed tab.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground font-mono">No results yet.</p>
+              )
             ) : (
               <>
                 {/* ── Filter controls row ─────────────────────────────── */}

@@ -35,6 +35,9 @@ interface ExtractionJobPanelProps {
   // Result state managed by parent (fed by SSE)
   successfulResults: ExtractionResult[];
   failedResults: ExtractionResult[];
+  resultsLoading: boolean;
+  resultsError: boolean;
+  onRetryResults: () => void;
   // Callbacks to parent
   onSelectJob: (id: string) => Promise<void>; // triggers snapshot fetch + viewedJobId tracking
   onStarted: (jobId: string, job?: ExtractionJob) => void; // triggers SSE stream open after successful start
@@ -57,6 +60,9 @@ export function ExtractionJobPanel({
   onModeChange,
   successfulResults,
   failedResults,
+  resultsLoading,
+  resultsError,
+  onRetryResults,
   onSelectJob,
   onStarted,
   onDeletedJob,
@@ -267,6 +273,9 @@ export function ExtractionJobPanel({
               job={selectedJob}
               successfulResults={successfulResults}
               failedResults={failedResults}
+              resultsLoading={resultsLoading}
+              resultsError={resultsError}
+              onRetryResults={onRetryResults}
               hasRunningJob={hasRunningJob}
               actionLoading={actionLoading}
               onStart={handleStart}

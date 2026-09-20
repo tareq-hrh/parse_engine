@@ -20,19 +20,15 @@ import {
   fetchExtractionJobs,
   useExtractionJobsQuery,
 } from "@/components/extraction-job/useExtractionJobs";
+import {
+  fetchExtractionJobResults,
+  type ExtractionJobResultsSnapshot,
+  useExtractionJobResultsQuery,
+} from "@/components/extraction-job/useExtractionJobResults";
 import type { ExtractionJobEvent } from "@/lib/extractionJobEvents";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/shadcn_ui/button";
 import Logo from "@/components/Logo";
-
-function dedupeResults(results: ExtractionResult[]): ExtractionResult[] {
-  const seen = new Set<string>();
-  return results.filter((result) => {
-    if (seen.has(result.id)) return false;
-    seen.add(result.id);
-    return true;
-  });
-}
 
 function prependUniqueResult(
   results: ExtractionResult[],
@@ -42,6 +38,8 @@ function prependUniqueResult(
   return [result, ...results];
 }
 
+const EMPTY_RESULTS: ExtractionResult[] = [];
+
 export default function Home() {
   const queryClient = useQueryClient();
   const extractionJobsQuery = useExtractionJobsQuery();
@@ -50,14 +48,16 @@ export default function Home() {
   const jobsError = extractionJobsQuery.isError;
 
   const [selectedExtractionJobId, setSelectedExtractionJobId] = useState<string | null>(null);
+  const selectedResultsQuery = useExtractionJobResultsQuery(selectedExtractionJobId);
+  const selectedResultsSnapshot = selectedResultsQuery.data ?? null;
+  const successfulResults = selectedResultsSnapshot?.successfulResults ?? EMPTY_RESULTS;
+  const failedResults = selectedResultsSnapshot?.failedResults ?? EMPTY_RESULTS;
+  const resultsLoading = selectedExtractionJobId !== null && selectedResultsQuery.isLoading;
+  const resultsError = selectedExtractionJobId !== null && selectedResultsQuery.isError;
   const [extractionJobPanelMode, setExtractionJobPanelMode] =
     useState<RightPanelMode>("empty");
   const [stopping, setStopping] = useState(false);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
-
-  // ── Result state lifted here so SSE can append to it ──────────────────────
-  const [successfulResults, setSuccessfulResults] = useState<ExtractionResult[]>([]);
-  const [failedResults, setFailedResults] = useState<ExtractionResult[]>([]);
 
   // ── Refs: avoid stale closures inside SSE onmessage handlers ─────────────
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -69,6 +69,19 @@ export default function Home() {
     (updater: (jobs: ExtractionJob[]) => ExtractionJob[]) => {
       queryClient.setQueryData<ExtractionJob[]>(queryKeys.extractionJobs, (current) =>
         updater(current ?? []),
+      );
+    },
+    [queryClient],
+  );
+
+  const updateResultsSnapshot = useCallback(
+    (
+      jobId: string,
+      updater: (snapshot: ExtractionJobResultsSnapshot) => ExtractionJobResultsSnapshot,
+    ) => {
+      queryClient.setQueryData<ExtractionJobResultsSnapshot>(
+        queryKeys.extractionJobResults(jobId),
+        (current) => (current ? updater(current) : current),
       );
     },
     [queryClient],
@@ -87,20 +100,32 @@ export default function Home() {
     }
   }, [queryClient]);
 
-  const fetchResultsSnapshot = useCallback(async (id: string) => {
+  const refreshResultsSnapshot = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/extraction-jobs/${id}/results`);
-      const data = await res.json();
-      if (viewedJobIdRef.current !== id) return;
-      if (data.job) {
-        updateJobs((prev) => prev.map((job) => (job.id === id ? data.job : job)));
+      const snapshot = await queryClient.fetchQuery({
+        queryKey: queryKeys.extractionJobResults(id),
+        queryFn: () => fetchExtractionJobResults(id),
+        staleTime: 0,
+      });
+      if (viewedJobIdRef.current !== id) return null;
+      if (snapshot.job) {
+        updateJobs((prev) => prev.map((job) => (job.id === id ? snapshot.job : job)));
       }
-      setSuccessfulResults(dedupeResults(data.successfulResults ?? []));
-      setFailedResults(dedupeResults(data.failedResults ?? []));
+      return snapshot;
     } catch {
       console.error("Failed to fetch extraction results snapshot");
+      return null;
     }
-  }, [updateJobs]);
+  }, [queryClient, updateJobs]);
+
+  useEffect(() => {
+    const selectedJob = selectedResultsSnapshot?.job;
+    if (!selectedJob) return;
+
+    updateJobs((prev) =>
+      prev.map((job) => (job.id === selectedJob.id ? selectedJob : job)),
+    );
+  }, [selectedResultsSnapshot?.job, updateJobs]);
 
   // ── SSE stream management ─────────────────────────────────────────────────
   const openSSEStream = useCallback(
@@ -176,9 +201,20 @@ export default function Home() {
               );
               // Append the result only if the user is viewing this job
               if (viewedJobIdRef.current === jobId) {
-                setSuccessfulResults((prev) =>
-                  prependUniqueResult(prev, event.result as ExtractionResult),
-                );
+                const result = event.result as ExtractionResult;
+                updateResultsSnapshot(jobId, (snapshot) => ({
+                  ...snapshot,
+                  successfulResultCount: event.successfulResultCount,
+                  failedResultCount: event.failedResultCount,
+                  job: {
+                    ...snapshot.job,
+                    successfulResultCount: event.successfulResultCount,
+                    failedResultCount: event.failedResultCount,
+                    lastSuccessfulInputLabel: event.lastSuccessfulInputLabel,
+                    currentInputLabel: null,
+                  },
+                  successfulResults: prependUniqueResult(snapshot.successfulResults, result),
+                }));
               }
               break;
 
@@ -197,9 +233,19 @@ export default function Home() {
                 ),
               );
               if (viewedJobIdRef.current === jobId) {
-                setFailedResults((prev) =>
-                  prependUniqueResult(prev, event.result as ExtractionResult),
-                );
+                const result = event.result as ExtractionResult;
+                updateResultsSnapshot(jobId, (snapshot) => ({
+                  ...snapshot,
+                  successfulResultCount: event.successfulResultCount,
+                  failedResultCount: event.failedResultCount,
+                  job: {
+                    ...snapshot.job,
+                    successfulResultCount: event.successfulResultCount,
+                    failedResultCount: event.failedResultCount,
+                    currentInputLabel: null,
+                  },
+                  failedResults: prependUniqueResult(snapshot.failedResults, result),
+                }));
               }
               break;
 
@@ -245,7 +291,7 @@ export default function Home() {
               // Final sync from DB to pick up any fields we don't track in SSE
               refreshJobs();
               if (viewedJobIdRef.current === jobId) {
-                fetchResultsSnapshot(jobId);
+                refreshResultsSnapshot(jobId);
               }
               break;
           }
@@ -262,7 +308,7 @@ export default function Home() {
             refreshJobs().then((latestJobs) => {
               const latestJob = latestJobs.find((job) => job.id === jobId);
               if (!latestJob?.isRunning && viewedJobIdRef.current === jobId) {
-                fetchResultsSnapshot(jobId);
+                refreshResultsSnapshot(jobId);
               }
             });
             return;
@@ -276,7 +322,7 @@ export default function Home() {
               if (latestJob?.isRunning) {
                 connect();
               } else if (viewedJobIdRef.current === jobId) {
-                fetchResultsSnapshot(jobId);
+                refreshResultsSnapshot(jobId);
               }
             });
           }, reconnectDelayMs);
@@ -285,23 +331,20 @@ export default function Home() {
 
       connect();
     },
-    [fetchResultsSnapshot, refreshJobs, updateJobs],
+    [refreshJobs, refreshResultsSnapshot, updateJobs, updateResultsSnapshot],
   );
   // ── Called when user selects an extraction job to view ───────────────────
   const handleSelectJob = useCallback(async (id: string) => {
     viewedJobIdRef.current = id;
-    setSuccessfulResults([]);
-    setFailedResults([]);
-    await fetchResultsSnapshot(id);
-  }, [fetchResultsSnapshot]);
+    await refreshResultsSnapshot(id);
+  }, [refreshResultsSnapshot]);
 
   const handleDeletedJob = useCallback((id: string) => {
     if (viewedJobIdRef.current === id) {
       viewedJobIdRef.current = null;
     }
-    setSuccessfulResults([]);
-    setFailedResults([]);
-  }, []);
+    queryClient.removeQueries({ queryKey: queryKeys.extractionJobResults(id) });
+  }, [queryClient]);
 
   const handleDeletedResult = useCallback(
     async (jobId: string, resultId: string): Promise<boolean> => {
@@ -316,8 +359,20 @@ export default function Home() {
           return false;
         }
 
-        setSuccessfulResults((prev) => prev.filter((result) => result.id !== resultId));
-        setFailedResults((prev) => prev.filter((result) => result.id !== resultId));
+        updateResultsSnapshot(jobId, (snapshot) => ({
+          ...snapshot,
+          successfulResultCount: data.successfulResultCount ?? snapshot.successfulResultCount,
+          failedResultCount: data.failedResultCount ?? snapshot.failedResultCount,
+          job: {
+            ...snapshot.job,
+            successfulResultCount:
+              data.successfulResultCount ?? snapshot.job.successfulResultCount,
+            failedResultCount: data.failedResultCount ?? snapshot.job.failedResultCount,
+            totalInputCount: data.totalInputCount ?? snapshot.job.totalInputCount,
+          },
+          successfulResults: snapshot.successfulResults.filter((result) => result.id !== resultId),
+          failedResults: snapshot.failedResults.filter((result) => result.id !== resultId),
+        }));
         updateJobs((prev) =>
           prev.map((job) =>
             job.id === jobId
@@ -334,7 +389,7 @@ export default function Home() {
 
         await refreshJobs();
         if (viewedJobIdRef.current === jobId) {
-          await fetchResultsSnapshot(jobId);
+          await refreshResultsSnapshot(jobId);
         }
 
         toast.success(data.message || "Extraction result deleted.");
@@ -344,13 +399,11 @@ export default function Home() {
         return false;
       }
     },
-    [fetchResultsSnapshot, refreshJobs, updateJobs],
+    [refreshJobs, refreshResultsSnapshot, updateJobs, updateResultsSnapshot],
   );
 
   const handleClearedJobSelection = useCallback(() => {
     viewedJobIdRef.current = null;
-    setSuccessfulResults([]);
-    setFailedResults([]);
   }, []);
   // ── Reconnect SSE if a job is already running on page load ────────────────
   // Runs once when the initial extraction-jobs query completes.
@@ -438,7 +491,7 @@ export default function Home() {
       window.setTimeout(() => {
         refreshJobs();
         if (viewedJobIdRef.current === runningJob.id) {
-          fetchResultsSnapshot(runningJob.id);
+          refreshResultsSnapshot(runningJob.id);
         }
       }, 1_500);
     } catch {
@@ -561,6 +614,11 @@ export default function Home() {
               onModeChange={setExtractionJobPanelMode}
               successfulResults={successfulResults}
               failedResults={failedResults}
+              resultsLoading={resultsLoading}
+              resultsError={resultsError}
+              onRetryResults={() => {
+                void selectedResultsQuery.refetch();
+              }}
               onSelectJob={handleSelectJob}
               onStarted={handleStarted}
               onDeletedJob={handleDeletedJob}

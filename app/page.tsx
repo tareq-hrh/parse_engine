@@ -25,6 +25,11 @@ import {
   type ExtractionJobResultsSnapshot,
   useExtractionJobResultsQuery,
 } from "@/components/extraction-job/useExtractionJobResults";
+import {
+  getMutationErrorMessage,
+  useDeleteExtractionResultMutation,
+  useStopExtractionJobMutation,
+} from "@/components/extraction-job/useExtractionJobMutations";
 import type { ExtractionJobEvent } from "@/lib/extractionJobEvents";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/shadcn_ui/button";
@@ -46,6 +51,8 @@ export default function Home() {
   const jobs = useMemo(() => extractionJobsQuery.data ?? [], [extractionJobsQuery.data]);
   const jobsLoading = extractionJobsQuery.isLoading;
   const jobsError = extractionJobsQuery.isError;
+  const stopExtractionJobMutation = useStopExtractionJobMutation();
+  const deleteExtractionResultMutation = useDeleteExtractionResultMutation();
 
   const [selectedExtractionJobId, setSelectedExtractionJobId] = useState<string | null>(null);
   const selectedResultsQuery = useExtractionJobResultsQuery(selectedExtractionJobId);
@@ -349,15 +356,7 @@ export default function Home() {
   const handleDeletedResult = useCallback(
     async (jobId: string, resultId: string): Promise<boolean> => {
       try {
-        const res = await fetch(`/api/extraction-jobs/${jobId}/results/${resultId}`, {
-          method: "DELETE",
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          toast.error(data.error || "Failed to delete extraction result.");
-          return false;
-        }
+        const data = await deleteExtractionResultMutation.mutateAsync({ jobId, resultId });
 
         updateResultsSnapshot(jobId, (snapshot) => ({
           ...snapshot,
@@ -394,12 +393,18 @@ export default function Home() {
 
         toast.success(data.message || "Extraction result deleted.");
         return true;
-      } catch {
-        toast.error("Network error. Please try again.");
+      } catch (error) {
+        toast.error(getMutationErrorMessage(error, "Failed to delete extraction result."));
         return false;
       }
     },
-    [refreshJobs, refreshResultsSnapshot, updateJobs, updateResultsSnapshot],
+    [
+      deleteExtractionResultMutation,
+      refreshJobs,
+      refreshResultsSnapshot,
+      updateJobs,
+      updateResultsSnapshot,
+    ],
   );
 
   const handleClearedJobSelection = useCallback(() => {
@@ -471,14 +476,7 @@ export default function Home() {
     if (!runningJob) return;
     setStopping(true);
     try {
-      const res = await fetch(`/api/extraction-jobs/${runningJob.id}/stop`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Failed to stop the extraction job.");
-        return;
-      }
+      const data = await stopExtractionJobMutation.mutateAsync(runningJob.id);
       toast.success(data.message || "Stop requested.");
       // Optimistically clear running state so the banner disappears immediately.
       // If the SSE stream is dead, the "stopped" event will never arrive and
@@ -494,8 +492,8 @@ export default function Home() {
           refreshResultsSnapshot(runningJob.id);
         }
       }, 1_500);
-    } catch {
-      toast.error("Network error. Please try again.");
+    } catch (error) {
+      toast.error(getMutationErrorMessage(error, "Failed to stop the extraction job."));
     } finally {
       setStopping(false);
     }

@@ -9,9 +9,13 @@ import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Separator } from "@/components/shadcn_ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/shadcn_ui/radio-group";
 import { Plus, Loader2, X, Brain, Database, RefreshCcw } from "lucide-react";
-import { ExtractionJob, OllamaModel } from "./types";
+import { ExtractionJob, ModelOptions, OllamaModel } from "./types";
 import { SegmentedSelector } from "./SegmentedSelector";
 import { formatNumCtx } from "./utils";
+import {
+  getMutationErrorMessage,
+  useCreateExtractionJobMutation,
+} from "./useExtractionJobMutations";
 
 interface DatasetOption {
   id: string;
@@ -38,7 +42,8 @@ export function CreateExtractionJobForm({
   const [instructionsLoading, setInstructionsLoading] = useState(true);
   const [datasetsLoading, setDatasetsLoading] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const createExtractionJobMutation = useCreateExtractionJobMutation();
+  const loading = createExtractionJobMutation.isPending;
 
   // ── Model Options state ──────────────────────────────────────────────────
   const [temperature, setTemperature] = useState(0);
@@ -141,36 +146,26 @@ export function CreateExtractionJobForm({
       return;
     }
 
-    setLoading(true);
     try {
-      const modelOptions: Record<string, unknown> = { temperature };
+      const modelOptions: ModelOptions = { temperature };
       if (numCtx !== null) modelOptions.num_ctx = numCtx;
       if (selectedModel.supportsThinking) {
-        modelOptions.think = selectedModel.thinkType === "boolean" ? think === "true" : think;
+        const thinkLevel =
+          think === "low" || think === "medium" || think === "high" ? think : "low";
+        modelOptions.think = selectedModel.thinkType === "boolean" ? think === "true" : thinkLevel;
       }
 
-      const res = await fetch("/api/extraction-jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim() || undefined,
-          modelName: selectedModel.name,
-          instructionId: selectedInstructionId,
-          datasetId: selectedDatasetId,
-          modelOptions,
-        }),
+      const createdJob = await createExtractionJobMutation.mutateAsync({
+        title: title.trim() || undefined,
+        modelName: selectedModel.name,
+        instructionId: selectedInstructionId,
+        datasetId: selectedDatasetId,
+        modelOptions,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Failed to create extraction job.");
-        return;
-      }
       toast.success("Extraction job created successfully.");
-      onCreated(data);
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+      onCreated(createdJob);
+    } catch (error) {
+      toast.error(getMutationErrorMessage(error, "Failed to create extraction job."));
     }
   }
 

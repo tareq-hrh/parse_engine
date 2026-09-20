@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
@@ -10,6 +9,12 @@ import { ExtractionJob, ExtractionResult, RightPanelMode } from "./extraction-jo
 import { ExtractionJobCard } from "./extraction-job/ExtractionJobCard";
 import { ExtractionJobDetails } from "./extraction-job/ExtractionJobDetails";
 import { CreateExtractionJobForm } from "./extraction-job/CreateExtractionJobForm";
+import {
+  getMutationErrorMessage,
+  useDeleteExtractionJobMutation,
+  useRetryFailedResultsMutation,
+  useStartExtractionJobMutation,
+} from "./extraction-job/useExtractionJobMutations";
 
 // ── Right Panel: Empty State ──────────────────────────────────────────────────
 function EmptyState() {
@@ -69,9 +74,13 @@ export function ExtractionJobPanel({
   onDeletedResult,
   onClearedSelection,
 }: ExtractionJobPanelProps) {
-  const [actionLoading, setActionLoading] = useState(false);
-  const [retryFailedLoading, setRetryFailedLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const startExtractionJobMutation = useStartExtractionJobMutation();
+  const retryFailedResultsMutation = useRetryFailedResultsMutation();
+  const deleteExtractionJobMutation = useDeleteExtractionJobMutation();
+
+  const actionLoading = startExtractionJobMutation.isPending;
+  const retryFailedLoading = retryFailedResultsMutation.isPending;
+  const deleteLoading = deleteExtractionJobMutation.isPending;
 
   async function handleSelectJob(id: string) {
     onSelectedIdChange(id);
@@ -102,42 +111,23 @@ export function ExtractionJobPanel({
 
   async function handleStart() {
     if (!selectedId) return;
-    setActionLoading(true);
     try {
-      const res = await fetch(`/api/extraction-jobs/${selectedId}/start`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Failed to start the extraction job.");
-        return;
-      }
+      const data = await startExtractionJobMutation.mutateAsync(selectedId);
       toast.success("Extraction job started.");
       // Open SSE immediately — SSE is the source of truth while running.
       // Do not refetch here: the start endpoint already returns the updated job
       // snapshot, and a late stale response would overwrite the optimistic banner.
       onStarted(selectedId, data.job);
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setActionLoading(false);
+    } catch (error) {
+      toast.error(getMutationErrorMessage(error, "Failed to start the extraction job."));
     }
   }
 
   async function handleRetryFailed() {
     if (!selectedId) return;
 
-    setRetryFailedLoading(true);
     try {
-      const res = await fetch(`/api/extraction-jobs/${selectedId}/retry-failed`, {
-        method: "POST",
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to clear failed results.");
-        return;
-      }
+      const data = await retryFailedResultsMutation.mutateAsync(selectedId);
 
       updateJobs((prev) =>
         prev.map((job) =>
@@ -156,10 +146,8 @@ export function ExtractionJobPanel({
 
       await onSelectJob(selectedId);
       toast.success(data.message || "Failed results cleared. Click Start to retry them.");
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setRetryFailedLoading(false);
+    } catch (error) {
+      toast.error(getMutationErrorMessage(error, "Failed to clear failed results."));
     }
   }
 
@@ -167,17 +155,8 @@ export function ExtractionJobPanel({
     if (!selectedId) return false;
 
     const jobId = selectedId;
-    setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/extraction-jobs/${jobId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to delete extraction job.");
-        return false;
-      }
+      const data = await deleteExtractionJobMutation.mutateAsync(jobId);
 
       updateJobs((prev) => prev.filter((job) => job.id !== jobId));
       onDeletedJob(jobId);
@@ -185,11 +164,9 @@ export function ExtractionJobPanel({
       onModeChange("empty");
       toast.success(data.message || "Extraction job deleted.");
       return true;
-    } catch {
-      toast.error("Network error. Please try again.");
+    } catch (error) {
+      toast.error(getMutationErrorMessage(error, "Failed to delete extraction job."));
       return false;
-    } finally {
-      setDeleteLoading(false);
     }
   }
 

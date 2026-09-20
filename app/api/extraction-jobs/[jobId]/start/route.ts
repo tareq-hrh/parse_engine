@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { runExtractionJob } from "@/lib/extractionJobRunner";
 import { checkOllamaHealth } from "@/lib/ollamaClient";
 import { isAppConfigError } from "@/lib/env";
+import { getExtractionJobSnapshot } from "@/lib/extractionJobSnapshots";
 import {
   claimExtractionJobRun,
   getActiveExtractionJobId,
@@ -103,6 +104,12 @@ export async function POST(
       throw error;
     }
 
+    const updatedJob = await getExtractionJobSnapshot(jobId);
+    if (!updatedJob) {
+      releaseExtractionJobRun(jobId);
+      return NextResponse.json({ error: "Extraction job not found." }, { status: 404 });
+    }
+
     runExtractionJob(jobId).catch((error) => {
       console.error("❌ Extraction job runner crashed unexpectedly:", error);
       releaseExtractionJobRun(jobId);
@@ -115,6 +122,7 @@ export async function POST(
         title: extractionJob.title,
         modelName: extractionJob.modelName,
         instructionTitle: instruction.title,
+        job: updatedJob,
       },
       { status: 200 },
     );

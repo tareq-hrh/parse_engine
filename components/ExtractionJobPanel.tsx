@@ -31,7 +31,7 @@ interface ExtractionJobPanelProps {
   failedResults: ExtractionResult[];
   // Callbacks to parent
   onSelectJob: (id: string) => Promise<void>; // triggers snapshot fetch + viewedJobId tracking
-  onStarted: (jobId: string) => void;         // triggers SSE stream open after successful start
+  onStarted: (jobId: string, job?: ExtractionJob) => void; // triggers SSE stream open after successful start
   onDeletedJob: (id: string) => void;
   onDeletedResult: (jobId: string, resultId: string) => Promise<boolean>;
   onClearedSelection: () => void;
@@ -101,7 +101,7 @@ export function ExtractionJobPanel({
       // Do NOT call fetchJobs() here: the runner sets isRunning=true in the DB
       // only after the health check (~100–500ms), so a fetchJobs() call now
       // would return isRunning:false and overwrite the optimistic banner update.
-      onStarted(selectedId);
+      onStarted(selectedId, data.job);
     } catch {
       toast.error("Network error. Please try again.");
     } finally {

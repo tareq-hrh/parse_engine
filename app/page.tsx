@@ -71,6 +71,9 @@ export default function Home() {
       const res = await fetch(`/api/extraction-jobs/${id}/results`);
       const data = await res.json();
       if (viewedJobIdRef.current !== id) return;
+      if (data.job) {
+        setJobs((prev) => prev.map((job) => (job.id === id ? data.job : job)));
+      }
       setSuccessfulResults(dedupeResults(data.successfulResults ?? []));
       setFailedResults(dedupeResults(data.failedResults ?? []));
     } catch {
@@ -381,11 +384,13 @@ export default function Home() {
 
   // ── Called after a successful Start in the panel ─────────────────────────
   const handleStarted = useCallback(
-    (jobId: string) => {
+    (jobId: string, jobSnapshot?: ExtractionJob) => {
       // Optimistically mark as running so the banner appears immediately,
       // without waiting for the SSE "started" event (which can be missed if
       // the runner emits it before the EventSource connects).
-      setJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, isRunning: true } : job)));
+      setJobs((prev) =>
+        prev.map((job) => (job.id === jobId ? (jobSnapshot ?? { ...job, isRunning: true }) : job)),
+      );
       openSSEStream(jobId);
     },
     [openSSEStream],

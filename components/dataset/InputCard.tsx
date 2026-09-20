@@ -25,6 +25,10 @@ import {
 } from "@/lib/datasetInputContentClient";
 import { DatasetInput } from "./types";
 import { ScrollArea } from "../shadcn_ui/scroll-area";
+import {
+  getDatasetMutationErrorMessage,
+  useDeleteDatasetInputMutation,
+} from "./useDatasetMutations";
 
 export function InputCard({
   input,
@@ -37,7 +41,8 @@ export function InputCard({
   const [content, setContent] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const deleteDatasetInputMutation = useDeleteDatasetInputMutation();
+  const deleteLoading = deleteDatasetInputMutation.isPending;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const contentId = `dataset-input-content-${input.id}`;
 
@@ -64,25 +69,14 @@ export function InputCard({
   }
 
   async function handleConfirmDelete() {
-    setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/dataset-inputs/${input.id}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to delete dataset input.");
-        return;
-      }
+      const data = await deleteDatasetInputMutation.mutateAsync(input.id);
 
       toast.success(data.message || "Dataset input deleted.");
       setDeleteDialogOpen(false);
       onDeleted(input.id);
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setDeleteLoading(false);
+    } catch (error) {
+      toast.error(getDatasetMutationErrorMessage(error, "Failed to delete dataset input."));
     }
   }
 

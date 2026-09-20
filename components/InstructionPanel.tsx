@@ -1,16 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { WorkspacePanelShell } from "@/components/WorkspacePanelShell";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, RefreshCcw } from "lucide-react";
+import { queryKeys } from "@/lib/queryKeys";
 import { Instruction, RightPanelMode } from "./instruction/types";
 import { InstructionCard } from "./instruction/InstructionCard";
 import { ViewInstruction } from "./instruction/ViewInstruction";
 import { CreateInstructionForm } from "./instruction/CreateInstructionForm";
 import { EditInstructionForm } from "./instruction/EditInstructionForm";
+import { useInstructionsQuery } from "./instruction/useInstructions";
+import {
+  getInstructionMutationErrorMessage,
+  useDeleteInstructionMutation,
+} from "./instruction/useInstructionMutations";
+
+const EMPTY_INSTRUCTIONS: Instruction[] = [];
 
 // ── Right Panel: Empty State ──────────────────────────────────────────────────
 function EmptyState() {
@@ -23,30 +32,21 @@ function EmptyState() {
 
 // ── Main InstructionPanel ─────────────────────────────────────────────────────
 export function InstructionPanel() {
-  const [instructions, setInstructions] = useState<Instruction[]>([]);
+  const queryClient = useQueryClient();
+  const instructionsQuery = useInstructionsQuery();
+  const instructions = instructionsQuery.data ?? EMPTY_INSTRUCTIONS;
+  const loading = instructionsQuery.isLoading;
+  const instructionsError = instructionsQuery.isError;
+  const deleteInstructionMutation = useDeleteInstructionMutation();
+  const deleteLoading = deleteInstructionMutation.isPending;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<RightPanelMode>("empty");
-  const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchInstructions = useCallback(async () => {
-    try {
-      const res = await fetch("/api/instructions");
-      const data = await res.json();
-      setInstructions(data);
-    } catch {
-      console.error("Failed to fetch instructions");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const initFetchInstructions = async () => {
-      await fetchInstructions();
-    };
-    initFetchInstructions();
-  }, [fetchInstructions]);
+  function updateInstructions(updater: (instructions: Instruction[]) => Instruction[]) {
+    queryClient.setQueryData<Instruction[]>(queryKeys.instructions, (current) =>
+      updater(current ?? EMPTY_INSTRUCTIONS),
+    );
+  }
 
   function handleSelectInstruction(id: string) {
     setSelectedId(id);
@@ -76,13 +76,16 @@ export function InstructionPanel() {
   }
 
   function handleCreated(newInstruction: Instruction) {
-    setInstructions((prev) => [newInstruction, ...prev]);
+    updateInstructions((prev) => [
+      newInstruction,
+      ...prev.filter((instruction) => instruction.id !== newInstruction.id),
+    ]);
     setSelectedId(newInstruction.id);
     setMode("view");
   }
 
   function handleUpdated(updatedInstruction: Instruction) {
-    setInstructions((prev) =>
+    updateInstructions((prev) =>
       prev.map((instruction) =>
         instruction.id === updatedInstruction.id ? updatedInstruction : instruction,
       ),
@@ -95,28 +98,18 @@ export function InstructionPanel() {
     if (!selectedId) return false;
 
     const instructionId = selectedId;
-    setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/instructions/${instructionId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
+      const data = await deleteInstructionMutation.mutateAsync(instructionId);
 
-      if (!res.ok) {
-        toast.error(data.error || "Failed to delete instruction.");
-        return false;
-      }
-
-      setInstructions((prev) => prev.filter((instruction) => instruction.id !== instructionId));
+      updateInstructions((prev) => prev.filter((instruction) => instruction.id !== instructionId));
+      queryClient.removeQueries({ queryKey: queryKeys.instruction(instructionId) });
       setSelectedId(null);
       setMode("empty");
       toast.success(data.message || "Instruction deleted.");
       return true;
-    } catch {
-      toast.error("Network error. Please try again.");
+    } catch (error) {
+      toast.error(getInstructionMutationErrorMessage(error, "Failed to delete instruction."));
       return false;
-    } finally {
-      setDeleteLoading(false);
     }
   }
 
@@ -150,14 +143,34 @@ export function InstructionPanel() {
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
               )}
-              {!loading && instructions.length === 0 && (
+              {!loading && !instructionsError && instructions.length === 0 && (
                 <p className="text-center text-xs text-muted-foreground font-mono py-8">
                   No instructions yet.
                   <br />
                   Create your first one.
                 </p>
               )}
+              {!loading && instructionsError && (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <p className="text-xs text-destructive font-mono">
+                    Failed to load instructions.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void instructionsQuery.refetch();
+                    }}
+                    className="font-mono text-xs gap-1.5"
+                  >
+                    <RefreshCcw className="size-3.5" />
+                    Retry
+                  </Button>
+                </div>
+              )}
               {!loading &&
+                !instructionsError &&
                 instructions.map((instruction) => (
                   <InstructionCard
                     key={instruction.id}

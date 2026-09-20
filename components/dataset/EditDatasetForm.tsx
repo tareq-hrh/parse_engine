@@ -9,6 +9,10 @@ import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Textarea } from "@/components/shadcn_ui/textarea";
 import { Loader2, Save, X } from "lucide-react";
 import { Dataset } from "./types";
+import {
+  getDatasetMutationErrorMessage,
+  useUpdateDatasetMutation,
+} from "./useDatasetMutations";
 
 export function EditDatasetForm({
   dataset,
@@ -21,7 +25,8 @@ export function EditDatasetForm({
 }) {
   const [name, setName] = useState(dataset.name);
   const [description, setDescription] = useState(dataset.description ?? "");
-  const [loading, setLoading] = useState(false);
+  const updateDatasetMutation = useUpdateDatasetMutation();
+  const loading = updateDatasetMutation.isPending;
 
   async function handleSave() {
     if (!name.trim()) {
@@ -29,30 +34,17 @@ export function EditDatasetForm({
       return;
     }
 
-    setLoading(true);
     try {
-      const res = await fetch(`/api/datasets/${dataset.slug}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-        }),
+      const data = await updateDatasetMutation.mutateAsync({
+        slug: dataset.slug,
+        name: name.trim(),
+        description: description.trim() || null,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to update dataset.");
-        return;
-      }
 
       toast.success("Dataset updated.");
       onUpdated(data);
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      toast.error(getDatasetMutationErrorMessage(error, "Failed to update dataset."));
     }
   }
 

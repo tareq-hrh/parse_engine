@@ -16,6 +16,10 @@ import {
   schemaToSchemaFields,
   validateSchemaFields,
 } from "./SchemaBuilder";
+import {
+  getInstructionMutationErrorMessage,
+  useUpdateInstructionMutation,
+} from "./useInstructionMutations";
 
 export function EditInstructionForm({
   instruction,
@@ -31,7 +35,8 @@ export function EditInstructionForm({
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>(() =>
     schemaToSchemaFields(instruction.outputSchema),
   );
-  const [loading, setLoading] = useState(false);
+  const updateInstructionMutation = useUpdateInstructionMutation();
+  const loading = updateInstructionMutation.isPending;
 
   async function handleSave() {
     if (!title.trim()) {
@@ -51,31 +56,18 @@ export function EditInstructionForm({
 
     const parsedSchema = buildOutputSchema(schemaFields);
 
-    setLoading(true);
     try {
-      const res = await fetch(`/api/instructions/${instruction.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          prompt: prompt.trim(),
-          outputSchema: parsedSchema,
-        }),
+      const data = await updateInstructionMutation.mutateAsync({
+        instructionId: instruction.id,
+        title: title.trim(),
+        prompt: prompt.trim(),
+        outputSchema: parsedSchema,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to update instruction.");
-        return;
-      }
 
       toast.success("Instruction updated.");
       onUpdated(data);
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      toast.error(getInstructionMutationErrorMessage(error, "Failed to update instruction."));
     }
   }
 

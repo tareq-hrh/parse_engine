@@ -10,6 +10,10 @@ import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Plus, Loader2, X } from "lucide-react";
 import { Instruction } from "./types";
 import { SchemaBuilder, SchemaField, buildOutputSchema, validateSchemaFields } from "./SchemaBuilder";
+import {
+  getInstructionMutationErrorMessage,
+  useCreateInstructionMutation,
+} from "./useInstructionMutations";
 
 export function CreateInstructionForm({
   onCreated,
@@ -21,7 +25,8 @@ export function CreateInstructionForm({
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
-  const [loading, setLoading] = useState(false);
+  const createInstructionMutation = useCreateInstructionMutation();
+  const loading = createInstructionMutation.isPending;
 
 
   async function handleCreate() {
@@ -42,31 +47,17 @@ export function CreateInstructionForm({
 
     const parsedSchema = buildOutputSchema(schemaFields);
 
-    setLoading(true);
     try {
-      const res = await fetch("/api/instructions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          prompt: prompt.trim(),
-          outputSchema: parsedSchema,
-        }),
+      const data = await createInstructionMutation.mutateAsync({
+        title: title.trim(),
+        prompt: prompt.trim(),
+        outputSchema: parsedSchema,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to create instruction.");
-        return;
-      }
 
       toast.success("Instruction created successfully.");
       onCreated(data);
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      toast.error(getInstructionMutationErrorMessage(error, "Failed to create instruction."));
     }
   }
 

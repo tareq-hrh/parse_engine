@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, ChevronLeft, ChevronRight, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/shadcn_ui/button";
-import { DatasetInput, PaginationInfo } from "./types";
+import { queryKeys } from "@/lib/queryKeys";
+import { DatasetInput } from "./types";
 import { InputCard } from "./InputCard";
+import { DatasetInputsPage, useDatasetInputsQuery } from "./useDatasetInputs";
 
-// refreshKey / datasetSlug changes are handled by the parent via the `key` prop,
-// which remounts this component fresh — so no reset logic is needed here.
+const INPUT_PAGE_SIZE = 20;
+const EMPTY_INPUTS: DatasetInput[] = [];
+
 export function InputList({
   datasetSlug,
   onInputsChanged,
@@ -15,94 +19,75 @@ export function InputList({
   datasetSlug: string;
   onInputsChanged: () => void;
 }) {
-  const [inputs, setInputs] = useState<DatasetInput[]>([]);
-  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
-  const [loading, setLoading] = useState(true); // true on fresh mount
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const inputsQuery = useDatasetInputsQuery(datasetSlug, page, INPUT_PAGE_SIZE);
+  const inputs = inputsQuery.data?.inputs ?? EMPTY_INPUTS;
+  const pagination = inputsQuery.data?.pagination ?? null;
+  const totalPages = pagination?.totalPages ?? 1;
 
-  const page = pagination?.page ?? 1;
-
-  const loadPage = useCallback(
-    async (newPage: number, signal?: AbortSignal) => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/datasets/${datasetSlug}/inputs?page=${newPage}&limit=20`,
-          { signal },
-        );
-        const data = await res.json();
-        if (!res.ok) return;
-        setInputs(data.inputs ?? []);
-        setPagination(data.pagination ?? null);
-      } catch (err) {
-        if (!(err instanceof Error) || err.name !== "AbortError") {
-          console.error("Failed to fetch inputs");
-        }
-      } finally {
-        if (!signal?.aborted) {
-          setLoading(false);
-        }
-      }
-    },
-    [datasetSlug],
-  );
-
-  // Runs once on mount. All setState calls are inside callbacks — never synchronous
-  // in the effect body — so the lint rule is satisfied.
-  useEffect(() => {
-    const controller = new AbortController();
-
-    fetch(`/api/datasets/${datasetSlug}/inputs?page=1&limit=20`, {
-      signal: controller.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed");
-        return res.json();
-      })
-      .then((data) => {
-        setInputs(data.inputs ?? []);
-        setPagination(data.pagination ?? null);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          console.error("Failed to fetch inputs");
-          setLoading(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [datasetSlug]);
-
-  async function handlePageChange(newPage: number) {
-    await loadPage(newPage);
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
   }
 
-  async function handleInputDeleted(inputId: string) {
+  function handleInputDeleted(inputId: string) {
     if (inputs.length === 1 && page > 1) {
-      await loadPage(page - 1);
+      setPage(page - 1);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.datasetInputPages(datasetSlug),
+      });
       onInputsChanged();
       return;
     }
 
-    setInputs((prev) => prev.filter((input) => input.id !== inputId));
-    setPagination((prev) => {
-      if (!prev) return prev;
-      const total = Math.max(0, prev.total - 1);
-      const totalPages = Math.ceil(total / prev.limit);
-      return {
-        ...prev,
-        total,
-        totalPages,
-        page: totalPages === 0 ? 1 : Math.min(prev.page, totalPages),
-      };
+    queryClient.setQueryData<DatasetInputsPage>(
+      queryKeys.datasetInputs(datasetSlug, page, INPUT_PAGE_SIZE),
+      (current) => {
+        if (!current) return current;
+        const total = Math.max(0, current.pagination.total - 1);
+        const nextTotalPages = Math.ceil(total / current.pagination.limit);
+        return {
+          ...current,
+          inputs: current.inputs.filter((input) => input.id !== inputId),
+          pagination: {
+            ...current.pagination,
+            total,
+            totalPages: nextTotalPages,
+            page: nextTotalPages === 0 ? 1 : Math.min(current.pagination.page, nextTotalPages),
+          },
+        };
+      },
+    );
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.datasetInputPages(datasetSlug),
     });
     onInputsChanged();
   }
 
-  if (loading) {
+  if (inputsQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (inputsQuery.isError && !inputsQuery.data) {
+    return (
+      <div className="flex flex-col items-start gap-2 py-4">
+        <p className="text-xs text-destructive font-mono">Failed to load inputs.</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            void inputsQuery.refetch();
+          }}
+          className="font-mono text-xs gap-1.5"
+        >
+          <RefreshCcw className="size-3.5" />
+          Retry
+        </Button>
       </div>
     );
   }
@@ -139,7 +124,7 @@ export function InputList({
             <Button
               variant="outline"
               size="sm"
-              disabled={page >= pagination.totalPages}
+              disabled={page >= totalPages}
               onClick={() => handlePageChange(page + 1)}
               className="size-9 p-0"
               aria-label="Go to next input page"
@@ -148,7 +133,8 @@ export function InputList({
             </Button>
           </div>
           <span className="font-mono text-[11px] text-muted-foreground">
-            {pagination.total} inputs · page {pagination.page} of {pagination.totalPages}
+            {pagination.total} inputs · page {page} of {pagination.totalPages}
+            {inputsQuery.isFetching && " · loading"}
           </span>
         </div>
       )}

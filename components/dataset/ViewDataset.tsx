@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Separator } from "@/components/shadcn_ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn_ui/tabs";
 import { Button } from "@/components/shadcn_ui/button";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   Dialog,
   DialogClose,
@@ -40,12 +42,14 @@ export function ViewDataset({
   onDeleteDataset: () => Promise<boolean>;
   onInputsChanged: () => void;
 }) {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
   const [inputMethod, setInputMethod] = useState<InputMethod>("manual");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   function handleInputsAdded() {
-    setRefreshKey((k) => k + 1);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.datasetInputPages(dataset.slug),
+    });
     onInputsChanged();
   }
 
@@ -179,7 +183,6 @@ export function ViewDataset({
           {/* ── Inputs tab ──────────────────────────────────────────── */}
           <TabsContent value="inputs" className="mt-3">
             <InputList
-              key={`${dataset.slug}-${refreshKey}`}
               datasetSlug={dataset.slug}
               onInputsChanged={onInputsChanged}
             />

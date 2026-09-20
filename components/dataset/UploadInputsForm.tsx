@@ -6,6 +6,10 @@ import { Button } from "@/components/shadcn_ui/button";
 import { Loader2, Upload, FolderOpen, FileText } from "lucide-react";
 import { InputIngestionResult } from "./types";
 import { InputIngestionSummary } from "./InputIngestionSummary";
+import {
+  getDatasetMutationErrorMessage,
+  useAddDatasetInputsMutation,
+} from "./useDatasetMutations";
 
 export function UploadInputsForm({
   datasetId,
@@ -14,7 +18,9 @@ export function UploadInputsForm({
   datasetId: string;
   onUploaded: () => void;
 }) {
-  const [loading, setLoading] = useState(false);
+  const [readingFiles, setReadingFiles] = useState(false);
+  const addInputsMutation = useAddDatasetInputsMutation();
+  const loading = readingFiles || addInputsMutation.isPending;
   const [result, setResult] = useState<InputIngestionResult | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -30,7 +36,7 @@ export function UploadInputsForm({
       return;
     }
 
-    setLoading(true);
+    setReadingFiles(true);
     setResult(null);
 
     try {
@@ -51,22 +57,11 @@ export function UploadInputsForm({
         ),
       );
 
-      const res = await fetch("/api/dataset-inputs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          datasetId,
-          ingestionMethod: "file_upload",
-          inputs,
-        }),
+      const data = await addInputsMutation.mutateAsync({
+        datasetId,
+        ingestionMethod: "file_upload",
+        inputs,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Upload failed.");
-        return;
-      }
 
       setResult(data);
       if (data.added > 0) {
@@ -75,10 +70,10 @@ export function UploadInputsForm({
       } else {
         toast.warning("No new files were added.");
       }
-    } catch {
-      toast.error("Network error. Please try again.");
+    } catch (error) {
+      toast.error(getDatasetMutationErrorMessage(error, "Upload failed."));
     } finally {
-      setLoading(false);
+      setReadingFiles(false);
       // Reset file inputs so same files can be re-selected after clearing
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (folderInputRef.current) folderInputRef.current.value = "";

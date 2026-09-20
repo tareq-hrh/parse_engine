@@ -9,6 +9,8 @@ import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Separator } from "@/components/shadcn_ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/shadcn_ui/radio-group";
 import { Plus, Loader2, X, Brain, Database, RefreshCcw } from "lucide-react";
+import { useDatasetsQuery } from "@/components/dataset/useDatasets";
+import { useInstructionsQuery } from "@/components/instruction/useInstructions";
 import { ExtractionJob, ModelOptions, OllamaModel } from "./types";
 import { SegmentedSelector } from "./SegmentedSelector";
 import { formatNumCtx } from "./utils";
@@ -16,13 +18,11 @@ import {
   getMutationErrorMessage,
   useCreateExtractionJobMutation,
 } from "./useExtractionJobMutations";
+import { useOllamaModelsQuery } from "./useOllamaModels";
 
-interface DatasetOption {
-  id: string;
-  name: string;
-  slug: string;
-  inputCount: number;
-}
+const EMPTY_MODELS: OllamaModel[] = [];
+const EMPTY_INSTRUCTIONS: Array<{ id: string; title: string }> = [];
+const EMPTY_DATASETS: Array<{ id: string; name: string; inputCount: number }> = [];
 
 export function CreateExtractionJobForm({
   onCreated,
@@ -35,13 +35,23 @@ export function CreateExtractionJobForm({
   const [selectedModel, setSelectedModel] = useState<OllamaModel | null>(null);
   const [selectedInstructionId, setSelectedInstructionId] = useState("");
   const [selectedDatasetId, setSelectedDatasetId] = useState("");
-  const [models, setModels] = useState<OllamaModel[]>([]);
-  const [instructions, setInstructions] = useState<{ id: string; title: string }[]>([]);
-  const [datasets, setDatasets] = useState<DatasetOption[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
-  const [instructionsLoading, setInstructionsLoading] = useState(true);
-  const [datasetsLoading, setDatasetsLoading] = useState(true);
-  const [modelsError, setModelsError] = useState<string | null>(null);
+  const modelsQuery = useOllamaModelsQuery();
+  const instructionsQuery = useInstructionsQuery();
+  const datasetsQuery = useDatasetsQuery();
+  const models = modelsQuery.data?.models ?? EMPTY_MODELS;
+  const instructions = instructionsQuery.data ?? EMPTY_INSTRUCTIONS;
+  const datasets = datasetsQuery.data ?? EMPTY_DATASETS;
+  const modelsLoading = modelsQuery.isLoading;
+  const instructionsLoading = instructionsQuery.isLoading;
+  const datasetsLoading = datasetsQuery.isLoading;
+  const modelsError =
+    modelsQuery.error instanceof Error && modelsQuery.error.message
+      ? modelsQuery.error.message
+      : modelsQuery.isError
+        ? "Could not connect to Ollama. Is it running?"
+        : null;
+  const instructionsError = instructionsQuery.isError;
+  const datasetsError = datasetsQuery.isError;
   const createExtractionJobMutation = useCreateExtractionJobMutation();
   const loading = createExtractionJobMutation.isPending;
 
@@ -63,63 +73,41 @@ export function CreateExtractionJobForm({
     262144,
   ];
 
-  async function fetchModels() {
-    setModelsLoading(true);
-    setModelsError(null);
-    try {
-      const res = await fetch("/api/ollama/models");
-      const data = await res.json();
-      if (!res.ok) {
-        setModelsError(data.error || "Failed to fetch models.");
-        return;
-      }
-      setModels(data.models);
-      if (data.models.length > 0) setSelectedModel(data.models[0]);
-    } catch {
-      setModelsError("Could not connect to Ollama. Is it running?");
-    } finally {
-      setModelsLoading(false);
+  useEffect(() => {
+    if (models.length === 0) {
+      if (selectedModel !== null) setSelectedModel(null);
+      return;
     }
-  }
+
+    if (!selectedModel || !models.some((model) => model.name === selectedModel.name)) {
+      setSelectedModel(models[0]);
+    }
+  }, [models, selectedModel]);
 
   useEffect(() => {
-    const initFetchModels = async () => {
-      await fetchModels();
-    };
-    initFetchModels();
-  }, []);
+    if (instructions.length === 0) {
+      if (selectedInstructionId) setSelectedInstructionId("");
+      return;
+    }
+
+    if (
+      !selectedInstructionId ||
+      !instructions.some((instruction) => instruction.id === selectedInstructionId)
+    ) {
+      setSelectedInstructionId(instructions[0].id);
+    }
+  }, [instructions, selectedInstructionId]);
 
   useEffect(() => {
-    async function fetchInstructions() {
-      try {
-        const res = await fetch("/api/instructions");
-        const data = await res.json();
-        setInstructions(data);
-        if (data.length > 0) setSelectedInstructionId(data[0].id);
-      } catch {
-        toast.error("Failed to fetch instructions.");
-      } finally {
-        setInstructionsLoading(false);
-      }
+    if (datasets.length === 0) {
+      if (selectedDatasetId) setSelectedDatasetId("");
+      return;
     }
-    fetchInstructions();
-  }, []);
 
-  useEffect(() => {
-    async function fetchDatasets() {
-      try {
-        const res = await fetch("/api/datasets");
-        const data = await res.json();
-        setDatasets(Array.isArray(data) ? data : []);
-        if (data.length > 0) setSelectedDatasetId(data[0].id);
-      } catch {
-        toast.error("Failed to fetch datasets.");
-      } finally {
-        setDatasetsLoading(false);
-      }
+    if (!selectedDatasetId || !datasets.some((dataset) => dataset.id === selectedDatasetId)) {
+      setSelectedDatasetId(datasets[0].id);
     }
-    fetchDatasets();
-  }, []);
+  }, [datasets, selectedDatasetId]);
 
   useEffect(() => {
     const updateThink = () => {
@@ -232,7 +220,9 @@ export function CreateExtractionJobForm({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={fetchModels}
+                  onClick={() => {
+                    void modelsQuery.refetch();
+                  }}
                   className="h-6 px-2 font-mono text-[11px] text-muted-foreground hover:text-foreground gap-1 shrink-0"
                 >
                   <RefreshCcw className="size-3" />
@@ -246,7 +236,7 @@ export function CreateExtractionJobForm({
                 <code className="bg-muted px-1 rounded">ollama pull llama3.2</code>
               </p>
             )}
-            {!modelsLoading && models.length > 0 && (
+            {!modelsLoading && !modelsError && models.length > 0 && (
               <RadioGroup
                 value={selectedModel?.name ?? ""}
                 onValueChange={(name) =>
@@ -402,12 +392,29 @@ export function CreateExtractionJobForm({
                 Loading datasets...
               </div>
             )}
-            {!datasetsLoading && datasets.length === 0 && (
+            {!datasetsLoading && datasetsError && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-destructive font-mono">Failed to load datasets.</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    void datasetsQuery.refetch();
+                  }}
+                  className="h-6 px-2 font-mono text-[11px] text-muted-foreground hover:text-foreground gap-1 shrink-0"
+                >
+                  <RefreshCcw className="size-3" />
+                  Retry
+                </Button>
+              </div>
+            )}
+            {!datasetsLoading && !datasetsError && datasets.length === 0 && (
               <p className="text-xs text-muted-foreground font-mono">
                 No datasets found. Go to the Datasets tab and create one first.
               </p>
             )}
-            {!datasetsLoading && datasets.length > 0 && (
+            {!datasetsLoading && !datasetsError && datasets.length > 0 && (
               <RadioGroup
                 value={selectedDatasetId}
                 onValueChange={setSelectedDatasetId}
@@ -449,12 +456,29 @@ export function CreateExtractionJobForm({
                 Loading instructions...
               </div>
             )}
-            {!instructionsLoading && instructions.length === 0 && (
+            {!instructionsLoading && instructionsError && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-destructive font-mono">Failed to load instructions.</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    void instructionsQuery.refetch();
+                  }}
+                  className="h-6 px-2 font-mono text-[11px] text-muted-foreground hover:text-foreground gap-1 shrink-0"
+                >
+                  <RefreshCcw className="size-3" />
+                  Retry
+                </Button>
+              </div>
+            )}
+            {!instructionsLoading && !instructionsError && instructions.length === 0 && (
               <p className="text-xs text-muted-foreground font-mono">
                 No instructions found. Go to the Instructions tab and create one first.
               </p>
             )}
-            {!instructionsLoading && instructions.length > 0 && (
+            {!instructionsLoading && !instructionsError && instructions.length > 0 && (
               <RadioGroup
                 value={selectedInstructionId}
                 onValueChange={setSelectedInstructionId}

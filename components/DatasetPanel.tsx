@@ -1,16 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { WorkspacePanelShell } from "@/components/WorkspacePanelShell";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, RefreshCcw } from "lucide-react";
+import { queryKeys } from "@/lib/queryKeys";
 import { Dataset, RightPanelMode } from "./dataset/types";
 import { DatasetCard } from "./dataset/DatasetCard";
 import { CreateDatasetForm } from "./dataset/CreateDatasetForm";
 import { EditDatasetForm } from "./dataset/EditDatasetForm";
 import { ViewDataset } from "./dataset/ViewDataset";
+import { useDatasetsQuery } from "./dataset/useDatasets";
+import {
+  getDatasetMutationErrorMessage,
+  useDeleteDatasetMutation,
+} from "./dataset/useDatasetMutations";
+
+const EMPTY_DATASETS: Dataset[] = [];
 
 function EmptyState() {
   return (
@@ -21,30 +30,21 @@ function EmptyState() {
 }
 
 export function DatasetPanel() {
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const queryClient = useQueryClient();
+  const datasetsQuery = useDatasetsQuery();
+  const datasets = datasetsQuery.data ?? EMPTY_DATASETS;
+  const loading = datasetsQuery.isLoading;
+  const datasetsError = datasetsQuery.isError;
+  const deleteDatasetMutation = useDeleteDatasetMutation();
+  const deleteLoading = deleteDatasetMutation.isPending;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<RightPanelMode>("empty");
-  const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchDatasets = useCallback(async () => {
-    try {
-      const res = await fetch("/api/datasets");
-      const data = await res.json();
-      setDatasets(Array.isArray(data) ? data : []);
-    } catch {
-      console.error("Failed to fetch datasets");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const initFetch = async () => {
-      await fetchDatasets();
-    };
-    initFetch();
-  }, [fetchDatasets]);
+  function updateDatasets(updater: (datasets: Dataset[]) => Dataset[]) {
+    queryClient.setQueryData<Dataset[]>(queryKeys.datasets, (current) =>
+      updater(current ?? EMPTY_DATASETS),
+    );
+  }
 
   function handleSelectDataset(id: string) {
     setSelectedId(id);
@@ -74,13 +74,16 @@ export function DatasetPanel() {
   }
 
   function handleCreated(newDataset: Dataset) {
-    setDatasets((prev) => [newDataset, ...prev]);
+    updateDatasets((prev) => [
+      newDataset,
+      ...prev.filter((dataset) => dataset.id !== newDataset.id),
+    ]);
     setSelectedId(newDataset.id);
     setMode("view");
   }
 
   function handleUpdated(updatedDataset: Dataset) {
-    setDatasets((prev) =>
+    updateDatasets((prev) =>
       prev.map((dataset) => (dataset.id === updatedDataset.id ? updatedDataset : dataset)),
     );
     setSelectedId(updatedDataset.id);
@@ -91,34 +94,27 @@ export function DatasetPanel() {
     const selectedDataset = datasets.find((dataset) => dataset.id === selectedId);
     if (!selectedDataset) return false;
 
-    setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/datasets/${selectedDataset.slug}`, {
-        method: "DELETE",
+      const data = await deleteDatasetMutation.mutateAsync(selectedDataset.slug);
+
+      updateDatasets((prev) => prev.filter((dataset) => dataset.id !== selectedDataset.id));
+      queryClient.removeQueries({ queryKey: queryKeys.dataset(selectedDataset.slug) });
+      queryClient.removeQueries({
+        queryKey: queryKeys.datasetInputPages(selectedDataset.slug),
       });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to delete dataset.");
-        return false;
-      }
-
-      setDatasets((prev) => prev.filter((dataset) => dataset.id !== selectedDataset.id));
       setSelectedId(null);
       setMode("empty");
       toast.success(data.message || "Dataset deleted.");
       return true;
-    } catch {
-      toast.error("Network error. Please try again.");
+    } catch (error) {
+      toast.error(getDatasetMutationErrorMessage(error, "Failed to delete dataset."));
       return false;
-    } finally {
-      setDeleteLoading(false);
     }
   }
 
   // Called after any inputs are added so the input count updates in the card
   function handleInputsChanged() {
-    fetchDatasets();
+    void queryClient.invalidateQueries({ queryKey: queryKeys.datasets });
   }
 
   const selectedDataset = datasets.find((dataset) => dataset.id === selectedId) ?? null;
@@ -151,14 +147,34 @@ export function DatasetPanel() {
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
               )}
-              {!loading && datasets.length === 0 && (
+              {!loading && !datasetsError && datasets.length === 0 && (
                 <p className="text-center text-xs text-muted-foreground font-mono py-8">
                   No datasets yet.
                   <br />
                   Create your first one.
                 </p>
               )}
+              {!loading && datasetsError && (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <p className="text-xs text-destructive font-mono">
+                    Failed to load datasets.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void datasetsQuery.refetch();
+                    }}
+                    className="font-mono text-xs gap-1.5"
+                  >
+                    <RefreshCcw className="size-3.5" />
+                    Retry
+                  </Button>
+                </div>
+              )}
               {!loading &&
+                !datasetsError &&
                 datasets.map((dataset) => (
                   <DatasetCard
                     key={dataset.id}

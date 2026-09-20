@@ -10,6 +10,10 @@ import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Plus, Loader2, X } from "lucide-react";
 import { generateDatasetSlug } from "@/lib/datasetSlug";
 import { Dataset } from "./types";
+import {
+  getDatasetMutationErrorMessage,
+  useCreateDatasetMutation,
+} from "./useDatasetMutations";
 
 export function CreateDatasetForm({
   onCreated,
@@ -20,7 +24,8 @@ export function CreateDatasetForm({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
+  const createDatasetMutation = useCreateDatasetMutation();
+  const loading = createDatasetMutation.isPending;
   const slugPreview = generateDatasetSlug(name);
 
   async function handleCreate() {
@@ -29,30 +34,16 @@ export function CreateDatasetForm({
       return;
     }
 
-    setLoading(true);
     try {
-      const res = await fetch("/api/datasets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || undefined,
-        }),
+      const data = await createDatasetMutation.mutateAsync({
+        name: name.trim(),
+        description: description.trim() || undefined,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to create dataset.");
-        return;
-      }
 
       toast.success("Dataset created successfully.");
       onCreated(data);
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      toast.error(getDatasetMutationErrorMessage(error, "Failed to create dataset."));
     }
   }
 

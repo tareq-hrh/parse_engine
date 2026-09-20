@@ -10,6 +10,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/shadcn_ui/radio-group";
 import { Label } from "@/components/shadcn_ui/label";
 import { InputIngestionResult } from "./types";
 import { InputIngestionSummary } from "./InputIngestionSummary";
+import {
+  getDatasetMutationErrorMessage,
+  useAddDatasetInputsMutation,
+} from "./useDatasetMutations";
 
 interface InputRow {
   id: string;
@@ -29,7 +33,8 @@ export function ManualInputForm({
   onAdded: () => void;
 }) {
   const [rows, setRows] = useState<InputRow[]>([makeRow()]);
-  const [loading, setLoading] = useState(false);
+  const addInputsMutation = useAddDatasetInputsMutation();
+  const loading = addInputsMutation.isPending;
   const [result, setResult] = useState<InputIngestionResult | null>(null);
 
   // Auto-label state
@@ -84,29 +89,17 @@ export function ManualInputForm({
       }
     }
 
-    setLoading(true);
     setResult(null);
 
     try {
-      const res = await fetch("/api/dataset-inputs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          datasetId,
-          ingestionMethod: "manual_entry",
-          inputs: rows.map((r) => ({
-            label: r.label.trim(),
-            content: r.content.trim(),
-          })),
-        }),
+      const data = await addInputsMutation.mutateAsync({
+        datasetId,
+        ingestionMethod: "manual_entry",
+        inputs: rows.map((r) => ({
+          label: r.label.trim(),
+          content: r.content.trim(),
+        })),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Failed to add inputs.");
-        return;
-      }
 
       setResult(data);
 
@@ -121,10 +114,8 @@ export function ManualInputForm({
       } else {
         toast.warning("No inputs were added — see summary below.");
       }
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      toast.error(getDatasetMutationErrorMessage(error, "Failed to add inputs."));
     }
   }
 

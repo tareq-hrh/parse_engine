@@ -5,6 +5,7 @@ export const queryKeys = {
 
   datasets: ["datasets"] as const,
   dataset: (slug: string) => ["dataset", slug] as const,
+  datasetInputPages: (slug: string) => ["datasetInputs", slug] as const,
   datasetInputs: (slug: string, page: number, limit: number) =>
     ["datasetInputs", slug, page, limit] as const,
 

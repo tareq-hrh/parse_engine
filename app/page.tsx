@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { InstructionPanel } from "@/components/InstructionPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn_ui/tabs";
@@ -14,8 +15,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/shadcn_ui/tooltip";
-import { ExtractionJob, ExtractionResult } from "@/components/extraction-job/types";
+import { ExtractionJob, ExtractionResult, RightPanelMode } from "@/components/extraction-job/types";
+import {
+  fetchExtractionJobs,
+  useExtractionJobsQuery,
+} from "@/components/extraction-job/useExtractionJobs";
 import type { ExtractionJobEvent } from "@/lib/extractionJobEvents";
+import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/shadcn_ui/button";
 import Logo from "@/components/Logo";
 
@@ -37,8 +43,15 @@ function prependUniqueResult(
 }
 
 export default function Home() {
-  const [jobs, setJobs] = useState<ExtractionJob[]>([]);
-  const [jobsLoading, setJobsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const extractionJobsQuery = useExtractionJobsQuery();
+  const jobs = useMemo(() => extractionJobsQuery.data ?? [], [extractionJobsQuery.data]);
+  const jobsLoading = extractionJobsQuery.isLoading;
+  const jobsError = extractionJobsQuery.isError;
+
+  const [selectedExtractionJobId, setSelectedExtractionJobId] = useState<string | null>(null);
+  const [extractionJobPanelMode, setExtractionJobPanelMode] =
+    useState<RightPanelMode>("empty");
   const [stopping, setStopping] = useState(false);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
 
@@ -49,22 +62,30 @@ export default function Home() {
   // ── Refs: avoid stale closures inside SSE onmessage handlers ─────────────
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const initialRunningReconnectRef = useRef(false);
   const viewedJobIdRef = useRef<string | null>(null); // extraction job currently being viewed
 
-  const fetchJobs = useCallback(async (): Promise<ExtractionJob[]> => {
+  const updateJobs = useCallback(
+    (updater: (jobs: ExtractionJob[]) => ExtractionJob[]) => {
+      queryClient.setQueryData<ExtractionJob[]>(queryKeys.extractionJobs, (current) =>
+        updater(current ?? []),
+      );
+    },
+    [queryClient],
+  );
+
+  const refreshJobs = useCallback(async (): Promise<ExtractionJob[]> => {
     try {
-      const res = await fetch("/api/extraction-jobs");
-      const data = await res.json();
-      const nextJobs = Array.isArray(data) ? data : [];
-      setJobs(nextJobs);
-      return nextJobs;
+      return await queryClient.fetchQuery({
+        queryKey: queryKeys.extractionJobs,
+        queryFn: fetchExtractionJobs,
+        staleTime: 0,
+      });
     } catch {
       console.error("Failed to fetch extraction jobs");
-      return [];
-    } finally {
-      setJobsLoading(false);
+      return queryClient.getQueryData<ExtractionJob[]>(queryKeys.extractionJobs) ?? [];
     }
-  }, []);
+  }, [queryClient]);
 
   const fetchResultsSnapshot = useCallback(async (id: string) => {
     try {
@@ -72,14 +93,14 @@ export default function Home() {
       const data = await res.json();
       if (viewedJobIdRef.current !== id) return;
       if (data.job) {
-        setJobs((prev) => prev.map((job) => (job.id === id ? data.job : job)));
+        updateJobs((prev) => prev.map((job) => (job.id === id ? data.job : job)));
       }
       setSuccessfulResults(dedupeResults(data.successfulResults ?? []));
       setFailedResults(dedupeResults(data.failedResults ?? []));
     } catch {
       console.error("Failed to fetch extraction results snapshot");
     }
-  }, []);
+  }, [updateJobs]);
 
   // ── SSE stream management ─────────────────────────────────────────────────
   const openSSEStream = useCallback(
@@ -116,15 +137,15 @@ export default function Home() {
 
             case "started":
               reconnectAttempt = 0;
-              // Runner confirmed started — mark the job as running in local state
-              setJobs((prev) =>
+              // Runner confirmed started — mark the job as running in query cache
+              updateJobs((prev) =>
                 prev.map((job) => (job.id === jobId ? { ...job, isRunning: true } : job)),
               );
               break;
 
             case "processing":
               reconnectAttempt = 0;
-              setJobs((prev) =>
+              updateJobs((prev) =>
                 prev.map((job) =>
                   job.id === jobId
                     ? {
@@ -140,7 +161,7 @@ export default function Home() {
 
             case "input_success":
               reconnectAttempt = 0;
-              setJobs((prev) =>
+              updateJobs((prev) =>
                 prev.map((job) =>
                   job.id === jobId
                     ? {
@@ -163,7 +184,7 @@ export default function Home() {
 
             case "input_failed":
               reconnectAttempt = 0;
-              setJobs((prev) =>
+              updateJobs((prev) =>
                 prev.map((job) =>
                   job.id === jobId
                     ? {
@@ -184,7 +205,7 @@ export default function Home() {
 
             case "input_skipped":
               reconnectAttempt = 0;
-              setJobs((prev) =>
+              updateJobs((prev) =>
                 prev.map((job) =>
                   job.id === jobId
                     ? {
@@ -199,7 +220,7 @@ export default function Home() {
 
             case "stopped":
             case "completed":
-              setJobs((prev) =>
+              updateJobs((prev) =>
                 prev.map((job) =>
                   job.id === jobId
                     ? {
@@ -222,7 +243,7 @@ export default function Home() {
                 reconnectTimeoutRef.current = null;
               }
               // Final sync from DB to pick up any fields we don't track in SSE
-              fetchJobs();
+              refreshJobs();
               if (viewedJobIdRef.current === jobId) {
                 fetchResultsSnapshot(jobId);
               }
@@ -238,7 +259,7 @@ export default function Home() {
 
           reconnectAttempt++;
           if (reconnectAttempt > 5) {
-            fetchJobs().then((latestJobs) => {
+            refreshJobs().then((latestJobs) => {
               const latestJob = latestJobs.find((job) => job.id === jobId);
               if (!latestJob?.isRunning && viewedJobIdRef.current === jobId) {
                 fetchResultsSnapshot(jobId);
@@ -250,7 +271,7 @@ export default function Home() {
           const reconnectDelayMs = Math.min(1_000 * reconnectAttempt, 5_000);
           reconnectTimeoutRef.current = window.setTimeout(() => {
             reconnectTimeoutRef.current = null;
-            fetchJobs().then((latestJobs) => {
+            refreshJobs().then((latestJobs) => {
               const latestJob = latestJobs.find((job) => job.id === jobId);
               if (latestJob?.isRunning) {
                 connect();
@@ -264,7 +285,7 @@ export default function Home() {
 
       connect();
     },
-    [fetchJobs, fetchResultsSnapshot],
+    [fetchResultsSnapshot, refreshJobs, updateJobs],
   );
   // ── Called when user selects an extraction job to view ───────────────────
   const handleSelectJob = useCallback(async (id: string) => {
@@ -297,7 +318,7 @@ export default function Home() {
 
         setSuccessfulResults((prev) => prev.filter((result) => result.id !== resultId));
         setFailedResults((prev) => prev.filter((result) => result.id !== resultId));
-        setJobs((prev) =>
+        updateJobs((prev) =>
           prev.map((job) =>
             job.id === jobId
               ? {
@@ -311,7 +332,7 @@ export default function Home() {
           ),
         );
 
-        await fetchJobs();
+        await refreshJobs();
         if (viewedJobIdRef.current === jobId) {
           await fetchResultsSnapshot(jobId);
         }
@@ -323,7 +344,7 @@ export default function Home() {
         return false;
       }
     },
-    [fetchJobs, fetchResultsSnapshot],
+    [fetchResultsSnapshot, refreshJobs, updateJobs],
   );
 
   const handleClearedJobSelection = useCallback(() => {
@@ -331,28 +352,23 @@ export default function Home() {
     setSuccessfulResults([]);
     setFailedResults([]);
   }, []);
-  // ── Initial load ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const initFetchJobs = async () => {
-      await fetchJobs();
-    };
-    initFetchJobs();
-  }, [fetchJobs]);
-
   // ── Reconnect SSE if a job is already running on page load ────────────────
-  // Runs once when the initial fetchJobs completes (jobsLoading flips to false)
+  // Runs once when the initial extraction-jobs query completes.
   useEffect(() => {
-    if (jobsLoading) return;
+    if (jobsLoading || jobsError || initialRunningReconnectRef.current) return;
+    initialRunningReconnectRef.current = true;
+
     const runningJob = jobs.find((job) => job.isRunning);
     if (runningJob && !eventSourceRef.current) {
       openSSEStream(runningJob.id);
+      setSelectedExtractionJobId(runningJob.id);
+      setExtractionJobPanelMode("view");
       // Also select the running job so viewedJobIdRef is set and the snapshot
       // loads — otherwise input_success/input_failed events are dropped because
       // viewedJobIdRef.current is null and results never appear on refresh.
       handleSelectJob(runningJob.id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobsLoading]); // intentionally only fires when loading state changes
+  }, [handleSelectJob, jobs, jobsError, jobsLoading, openSSEStream]);
 
   // ── Cleanup SSE stream on unmount ─────────────────────────────────────────
   useEffect(() => {
@@ -388,12 +404,12 @@ export default function Home() {
       // Optimistically mark as running so the banner appears immediately,
       // without waiting for the SSE "started" event (which can be missed if
       // the runner emits it before the EventSource connects).
-      setJobs((prev) =>
+      updateJobs((prev) =>
         prev.map((job) => (job.id === jobId ? (jobSnapshot ?? { ...job, isRunning: true }) : job)),
       );
       openSSEStream(jobId);
     },
-    [openSSEStream],
+    [openSSEStream, updateJobs],
   );
 
   // ── Stop handler — owned here so banner and panel share the same action ───
@@ -413,14 +429,14 @@ export default function Home() {
       toast.success(data.message || "Stop requested.");
       // Optimistically clear running state so the banner disappears immediately.
       // If the SSE stream is dead, the "stopped" event will never arrive and
-      // the banner would hang forever. fetchJobs() syncs final DB state.
-      setJobs((prev) =>
+      // the banner would hang forever. refreshJobs() syncs final DB state.
+      updateJobs((prev) =>
         prev.map((job) =>
           job.id === runningJob.id ? { ...job, isRunning: false, currentInputLabel: null } : job,
         ),
       );
       window.setTimeout(() => {
-        fetchJobs();
+        refreshJobs();
         if (viewedJobIdRef.current === runningJob.id) {
           fetchResultsSnapshot(runningJob.id);
         }
@@ -532,9 +548,17 @@ export default function Home() {
           <TabsContent value="extraction-jobs" className="flex-1 overflow-hidden mt-0">
             <ExtractionJobPanel
               jobs={jobs}
-              setJobs={setJobs}
+              updateJobs={updateJobs}
               hasRunningJob={hasRunningJob}
               jobsLoading={jobsLoading}
+              jobsError={jobsError}
+              onRetryJobs={() => {
+                void extractionJobsQuery.refetch();
+              }}
+              selectedId={selectedExtractionJobId}
+              mode={extractionJobPanelMode}
+              onSelectedIdChange={setSelectedExtractionJobId}
+              onModeChange={setExtractionJobPanelMode}
               successfulResults={successfulResults}
               failedResults={failedResults}
               onSelectJob={handleSelectJob}

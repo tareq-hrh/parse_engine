@@ -23,9 +23,15 @@ function EmptyState() {
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface ExtractionJobPanelProps {
   jobs: ExtractionJob[];
-  setJobs: React.Dispatch<React.SetStateAction<ExtractionJob[]>>;
+  updateJobs: (updater: (jobs: ExtractionJob[]) => ExtractionJob[]) => void;
   hasRunningJob: boolean;
   jobsLoading: boolean;
+  jobsError: boolean;
+  onRetryJobs: () => void;
+  selectedId: string | null;
+  mode: RightPanelMode;
+  onSelectedIdChange: (id: string | null) => void;
+  onModeChange: (mode: RightPanelMode) => void;
   // Result state managed by parent (fed by SSE)
   successfulResults: ExtractionResult[];
   failedResults: ExtractionResult[];
@@ -40,9 +46,15 @@ interface ExtractionJobPanelProps {
 // ── Main ExtractionJobPanel ─────────────────────────────────────────────────────
 export function ExtractionJobPanel({
   jobs,
-  setJobs,
+  updateJobs,
   hasRunningJob,
   jobsLoading,
+  jobsError,
+  onRetryJobs,
+  selectedId,
+  mode,
+  onSelectedIdChange,
+  onModeChange,
   successfulResults,
   failedResults,
   onSelectJob,
@@ -51,35 +63,33 @@ export function ExtractionJobPanel({
   onDeletedResult,
   onClearedSelection,
 }: ExtractionJobPanelProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<RightPanelMode>("empty");
   const [actionLoading, setActionLoading] = useState(false);
   const [retryFailedLoading, setRetryFailedLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   async function handleSelectJob(id: string) {
-    setSelectedId(id);
-    setMode("view");
+    onSelectedIdChange(id);
+    onModeChange("view");
     await onSelectJob(id);
   }
 
   function handleBackToList() {
-    setSelectedId(null);
-    setMode("empty");
+    onSelectedIdChange(null);
+    onModeChange("empty");
     onClearedSelection();
   }
 
   function handleOpenCreate() {
-    setMode("create");
+    onModeChange("create");
   }
   function handleCancelCreate() {
-    setMode(selectedId ? "view" : "empty");
+    onModeChange(selectedId ? "view" : "empty");
   }
 
   async function handleCreated(newJob: ExtractionJob) {
-    setJobs((prev) => [newJob, ...prev]);
-    setSelectedId(newJob.id);
-    setMode("view");
+    updateJobs((prev) => [newJob, ...prev]);
+    onSelectedIdChange(newJob.id);
+    onModeChange("view");
     // Notify parent to clear results and set viewedJobId for the new job
     await onSelectJob(newJob.id);
   }
@@ -98,9 +108,8 @@ export function ExtractionJobPanel({
       }
       toast.success("Extraction job started.");
       // Open SSE immediately — SSE is the source of truth while running.
-      // Do NOT call fetchJobs() here: the runner sets isRunning=true in the DB
-      // only after the health check (~100–500ms), so a fetchJobs() call now
-      // would return isRunning:false and overwrite the optimistic banner update.
+      // Do not refetch here: the start endpoint already returns the updated job
+      // snapshot, and a late stale response would overwrite the optimistic banner.
       onStarted(selectedId, data.job);
     } catch {
       toast.error("Network error. Please try again.");
@@ -124,7 +133,7 @@ export function ExtractionJobPanel({
         return;
       }
 
-      setJobs((prev) =>
+      updateJobs((prev) =>
         prev.map((job) =>
           job.id === selectedId
             ? {
@@ -164,10 +173,10 @@ export function ExtractionJobPanel({
         return false;
       }
 
-      setJobs((prev) => prev.filter((job) => job.id !== jobId));
+      updateJobs((prev) => prev.filter((job) => job.id !== jobId));
       onDeletedJob(jobId);
-      setSelectedId(null);
-      setMode("empty");
+      onSelectedIdChange(null);
+      onModeChange("empty");
       toast.success(data.message || "Extraction job deleted.");
       return true;
     } catch {
@@ -215,7 +224,19 @@ export function ExtractionJobPanel({
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
               )}
-              {!jobsLoading && jobs.length === 0 && (
+              {!jobsLoading && jobsError && (
+                <div className="py-8 text-center font-mono text-xs text-muted-foreground">
+                  <p>Failed to load extraction jobs.</p>
+                  <button
+                    type="button"
+                    onClick={onRetryJobs}
+                    className="mt-2 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!jobsLoading && !jobsError && jobs.length === 0 && (
                 <p className="text-center text-xs text-muted-foreground font-mono py-8">
                   No extraction jobs yet.
                   <br />
@@ -223,6 +244,7 @@ export function ExtractionJobPanel({
                 </p>
               )}
               {!jobsLoading &&
+                !jobsError &&
                 sortedJobs.map((job) => (
                   <ExtractionJobCard
                     key={job.id}

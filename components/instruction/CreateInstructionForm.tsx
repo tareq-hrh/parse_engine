@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Plus, X } from "lucide-react";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
+
 import { Button } from "@/components/shadcn_ui/button";
 import { Input } from "@/components/shadcn_ui/input";
 import { Label } from "@/components/shadcn_ui/label";
-import { Textarea } from "@/components/shadcn_ui/textarea";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
-import { Plus, Loader2, X } from "lucide-react";
+import { Textarea } from "@/components/shadcn_ui/textarea";
 import { Instruction } from "./types";
-import { SchemaBuilder, SchemaField, buildOutputSchema, validateSchemaFields } from "./SchemaBuilder";
+import { SchemaBuilder, buildOutputSchema } from "./SchemaBuilder";
+import { instructionFormSchema, type InstructionFormValues } from "./instructionFormSchema";
 import {
   getInstructionMutationErrorMessage,
   useCreateInstructionMutation,
@@ -22,35 +25,29 @@ export function CreateInstructionForm({
   onCreated: (newInstruction: Instruction) => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
   const createInstructionMutation = useCreateInstructionMutation();
   const loading = createInstructionMutation.isPending;
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<InstructionFormValues>({
+    resolver: zodResolver(instructionFormSchema),
+    defaultValues: {
+      title: "",
+      prompt: "",
+      schemaFields: [],
+    },
+  });
 
-
-  async function handleCreate() {
-    if (!title.trim()) {
-      toast.error("Title is required.");
-      return;
-    }
-    if (!prompt.trim()) {
-      toast.error("Prompt template is required.");
-      return;
-    }
-
-    const schemaError = validateSchemaFields(schemaFields);
-    if (schemaError) {
-      toast.error(schemaError);
-      return;
-    }
-
-    const parsedSchema = buildOutputSchema(schemaFields);
+  async function handleCreate(values: InstructionFormValues) {
+    const parsedSchema = buildOutputSchema(values.schemaFields);
 
     try {
       const data = await createInstructionMutation.mutateAsync({
-        title: title.trim(),
-        prompt: prompt.trim(),
+        title: values.title,
+        prompt: values.prompt,
         outputSchema: parsedSchema,
       });
 
@@ -62,12 +59,16 @@ export function CreateInstructionForm({
   }
 
   return (
-    <>
-      {/* Header */}
+    <form
+      id="create-instruction-form"
+      onSubmit={handleSubmit(handleCreate)}
+      className="flex min-h-0 flex-1 flex-col"
+    >
       <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-surface-panel-header p-5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-mono text-base font-semibold text-foreground">New Instruction</h2>
         <div className="flex gap-2 sm:justify-end">
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={onCancel}
@@ -77,8 +78,8 @@ export function CreateInstructionForm({
             Cancel
           </Button>
           <Button
+            type="submit"
             size="sm"
-            onClick={handleCreate}
             disabled={loading}
             className="flex-1 font-mono text-xs gap-1.5 bg-blue-600 hover:bg-blue-500 text-white sm:flex-none"
           >
@@ -88,10 +89,8 @@ export function CreateInstructionForm({
         </div>
       </div>
 
-      {/* Form */}
       <ScrollArea className="flex-1">
         <div className="p-5 space-y-5">
-          {/* Title */}
           <div className="space-y-2">
             <Label
               htmlFor="instruction-title"
@@ -101,14 +100,16 @@ export function CreateInstructionForm({
             </Label>
             <Input
               id="instruction-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              {...register("title")}
               placeholder="e.g. Invoice Extraction v1"
+              aria-invalid={errors.title ? "true" : undefined}
               className="font-mono text-sm"
             />
+            {errors.title && (
+              <p className="font-mono text-xs text-destructive">{errors.title.message}</p>
+            )}
           </div>
 
-          {/* Prompt template */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label
@@ -120,34 +121,47 @@ export function CreateInstructionForm({
             </div>
             <Textarea
               id="instruction-prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              {...register("prompt")}
               placeholder="You are an information extraction engine. Extract structured data from the following input:&#10;&#10;{INPUT_TEXT}&#10;&#10;Return JSON only."
+              aria-invalid={errors.prompt ? "true" : undefined}
               className="font-mono text-xs h-60"
             />
-            {/* Static note */}
-            <p className="text-[10px] text-muted-foreground/60 font-mono">
-              <code className="text-blue-400">{"{INPUT_TEXT}"}</code> specifies where the input content
-              should be inserted. If omitted, the input is appended to the end of the prompt automatically.
-            </p>
+            {errors.prompt ? (
+              <p className="font-mono text-xs text-destructive">{errors.prompt.message}</p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground/60 font-mono">
+                <code className="text-blue-400">{"{INPUT_TEXT}"}</code> specifies where the input
+                content should be inserted. If omitted, the input is appended to the end of the
+                prompt automatically.
+              </p>
+            )}
           </div>
 
-          {/* Output Schema */}
           <div className="space-y-2">
             <Label className="font-mono text-xs uppercase tracking-wider">
               Output Schema{" "}
               <span className="text-muted-foreground font-normal normal-case">(optional)</span>
             </Label>
-            <SchemaBuilder value={schemaFields} onChange={setSchemaFields} />
+            <Controller
+              control={control}
+              name="schemaFields"
+              render={({ field }) => (
+                <SchemaBuilder value={field.value} onChange={field.onChange} />
+              )}
+            />
+            {errors.schemaFields && (
+              <p className="font-mono text-xs text-destructive">{errors.schemaFields.message}</p>
+            )}
           </div>
-          {/* Helper note */}
+
           <p className="text-[10px] text-muted-foreground/60 font-mono">
-            Define the expected shape of the extracted data. When provided, the schema is passed to the
-            model as a structured-output constraint. <span className="text-purple-400/70">object[]</span> fields support
-            nested sub-fields (e.g. line items).
+            Define the expected shape of the extracted data. When provided, the schema is passed to
+            the model as a structured-output constraint.{" "}
+            <span className="text-purple-400/70">object[]</span> fields support nested sub-fields
+            (e.g. line items).
           </p>
         </div>
       </ScrollArea>
-    </>
+    </form>
   );
 }

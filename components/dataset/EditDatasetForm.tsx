@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Save, X } from "lucide-react";
+import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
+
 import { Button } from "@/components/shadcn_ui/button";
 import { Input } from "@/components/shadcn_ui/input";
 import { Label } from "@/components/shadcn_ui/label";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Textarea } from "@/components/shadcn_ui/textarea";
-import { Loader2, Save, X } from "lucide-react";
+import { datasetFormSchema, type DatasetFormValues } from "./datasetFormSchema";
 import { Dataset } from "./types";
 import {
   getDatasetMutationErrorMessage,
@@ -23,22 +26,26 @@ export function EditDatasetForm({
   onUpdated: (dataset: Dataset) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(dataset.name);
-  const [description, setDescription] = useState(dataset.description ?? "");
   const updateDatasetMutation = useUpdateDatasetMutation();
   const loading = updateDatasetMutation.isPending;
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<DatasetFormValues>({
+    resolver: zodResolver(datasetFormSchema),
+    defaultValues: {
+      name: dataset.name,
+      description: dataset.description ?? "",
+    },
+  });
 
-  async function handleSave() {
-    if (!name.trim()) {
-      toast.error("Dataset name is required.");
-      return;
-    }
-
+  async function handleSave(values: DatasetFormValues) {
     try {
       const data = await updateDatasetMutation.mutateAsync({
         slug: dataset.slug,
-        name: name.trim(),
-        description: description.trim() || null,
+        name: values.name,
+        description: values.description || null,
       });
 
       toast.success("Dataset updated.");
@@ -49,11 +56,16 @@ export function EditDatasetForm({
   }
 
   return (
-    <>
+    <form
+      id="edit-dataset-form"
+      onSubmit={handleSubmit(handleSave)}
+      className="flex min-h-0 flex-1 flex-col"
+    >
       <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-surface-panel-header p-5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-mono text-base font-semibold text-foreground">Edit Dataset</h2>
         <div className="flex gap-2 sm:justify-end">
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={onCancel}
@@ -64,8 +76,8 @@ export function EditDatasetForm({
             Cancel
           </Button>
           <Button
+            type="submit"
             size="sm"
-            onClick={handleSave}
             disabled={loading}
             className="flex-1 font-mono text-xs gap-1.5 bg-blue-600 hover:bg-blue-500 text-white sm:flex-none"
           >
@@ -86,14 +98,18 @@ export function EditDatasetForm({
             </Label>
             <Input
               id="edit-dataset-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              {...register("name")}
               placeholder="e.g. Invoices 2025"
+              aria-invalid={errors.name ? "true" : undefined}
               className="font-mono text-sm"
             />
-            <p className="font-mono text-[11px] text-muted-foreground">
-              API slug stays: <span className="text-foreground">{dataset.slug}</span>
-            </p>
+            {errors.name ? (
+              <p className="font-mono text-xs text-destructive">{errors.name.message}</p>
+            ) : (
+              <p className="font-mono text-[11px] text-muted-foreground">
+                API slug stays: <span className="text-foreground">{dataset.slug}</span>
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -106,15 +122,13 @@ export function EditDatasetForm({
             </Label>
             <Textarea
               id="edit-dataset-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              {...register("description")}
               placeholder="e.g. Invoices from 2025"
               className="font-mono text-xs h-24"
             />
           </div>
-
         </div>
       </ScrollArea>
-    </>
+    </form>
   );
 }

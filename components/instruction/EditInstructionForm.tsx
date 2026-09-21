@@ -1,21 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Save, X } from "lucide-react";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
+
 import { Button } from "@/components/shadcn_ui/button";
 import { Input } from "@/components/shadcn_ui/input";
 import { Label } from "@/components/shadcn_ui/label";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Textarea } from "@/components/shadcn_ui/textarea";
-import { Loader2, Save, X } from "lucide-react";
 import { Instruction } from "./types";
-import {
-  SchemaBuilder,
-  SchemaField,
-  buildOutputSchema,
-  schemaToSchemaFields,
-  validateSchemaFields,
-} from "./SchemaBuilder";
+import { SchemaBuilder, buildOutputSchema, schemaToSchemaFields } from "./SchemaBuilder";
+import { instructionFormSchema, type InstructionFormValues } from "./instructionFormSchema";
 import {
   getInstructionMutationErrorMessage,
   useUpdateInstructionMutation,
@@ -30,37 +27,30 @@ export function EditInstructionForm({
   onUpdated: (updatedInstruction: Instruction) => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState(instruction.title);
-  const [prompt, setPrompt] = useState(instruction.prompt);
-  const [schemaFields, setSchemaFields] = useState<SchemaField[]>(() =>
-    schemaToSchemaFields(instruction.outputSchema),
-  );
   const updateInstructionMutation = useUpdateInstructionMutation();
   const loading = updateInstructionMutation.isPending;
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<InstructionFormValues>({
+    resolver: zodResolver(instructionFormSchema),
+    defaultValues: {
+      title: instruction.title,
+      prompt: instruction.prompt,
+      schemaFields: schemaToSchemaFields(instruction.outputSchema),
+    },
+  });
 
-  async function handleSave() {
-    if (!title.trim()) {
-      toast.error("Title is required.");
-      return;
-    }
-    if (!prompt.trim()) {
-      toast.error("Prompt template is required.");
-      return;
-    }
-
-    const schemaError = validateSchemaFields(schemaFields);
-    if (schemaError) {
-      toast.error(schemaError);
-      return;
-    }
-
-    const parsedSchema = buildOutputSchema(schemaFields);
+  async function handleSave(values: InstructionFormValues) {
+    const parsedSchema = buildOutputSchema(values.schemaFields);
 
     try {
       const data = await updateInstructionMutation.mutateAsync({
         instructionId: instruction.id,
-        title: title.trim(),
-        prompt: prompt.trim(),
+        title: values.title,
+        prompt: values.prompt,
         outputSchema: parsedSchema,
       });
 
@@ -72,11 +62,16 @@ export function EditInstructionForm({
   }
 
   return (
-    <>
+    <form
+      id="edit-instruction-form"
+      onSubmit={handleSubmit(handleSave)}
+      className="flex min-h-0 flex-1 flex-col"
+    >
       <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-surface-panel-header p-5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-mono text-base font-semibold text-foreground">Edit Instruction</h2>
         <div className="flex gap-2 sm:justify-end">
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={onCancel}
@@ -87,8 +82,8 @@ export function EditInstructionForm({
             Cancel
           </Button>
           <Button
+            type="submit"
             size="sm"
-            onClick={handleSave}
             disabled={loading}
             className="flex-1 font-mono text-xs gap-1.5 bg-blue-600 hover:bg-blue-500 text-white sm:flex-none"
           >
@@ -109,11 +104,14 @@ export function EditInstructionForm({
             </Label>
             <Input
               id="edit-instruction-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              {...register("title")}
               placeholder="e.g. Invoice Extraction v1"
+              aria-invalid={errors.title ? "true" : undefined}
               className="font-mono text-sm"
             />
+            {errors.title && (
+              <p className="font-mono text-xs text-destructive">{errors.title.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -125,16 +123,20 @@ export function EditInstructionForm({
             </Label>
             <Textarea
               id="edit-instruction-prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
+              {...register("prompt")}
               placeholder="You are an information extraction engine. Extract structured data from the following input:&#10;&#10;{INPUT_TEXT}&#10;&#10;Return JSON only."
+              aria-invalid={errors.prompt ? "true" : undefined}
               className="font-mono text-xs h-60"
             />
-            <p className="text-[10px] text-muted-foreground/60 font-mono">
-              <code className="text-blue-400">{"{INPUT_TEXT}"}</code> specifies where the input
-              content should be inserted. If omitted, the input is appended to the end of the prompt
-              automatically.
-            </p>
+            {errors.prompt ? (
+              <p className="font-mono text-xs text-destructive">{errors.prompt.message}</p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground/60 font-mono">
+                <code className="text-blue-400">{"{INPUT_TEXT}"}</code> specifies where the input
+                content should be inserted. If omitted, the input is appended to the end of the
+                prompt automatically.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -142,7 +144,16 @@ export function EditInstructionForm({
               Output Schema{" "}
               <span className="text-muted-foreground font-normal normal-case">(optional)</span>
             </Label>
-            <SchemaBuilder value={schemaFields} onChange={setSchemaFields} />
+            <Controller
+              control={control}
+              name="schemaFields"
+              render={({ field }) => (
+                <SchemaBuilder value={field.value} onChange={field.onChange} />
+              )}
+            />
+            {errors.schemaFields && (
+              <p className="font-mono text-xs text-destructive">{errors.schemaFields.message}</p>
+            )}
           </div>
 
           <p className="text-[10px] text-muted-foreground/60 font-mono">
@@ -150,9 +161,8 @@ export function EditInstructionForm({
             the model as a structured-output constraint.{" "}
             <span className="text-purple-400/70">object[]</span> fields support nested sub-fields.
           </p>
-
         </div>
       </ScrollArea>
-    </>
+    </form>
   );
 }

@@ -192,7 +192,7 @@ export function ViewDataset({
           <TabsContent value="add" className="mt-3 space-y-3">
             {/* Method selector */}
             <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
-              SELECT INPUT METHOD
+              SELECT INSERT METHOD
             </p>
             <div className="flex gap-1.5">
               <Button

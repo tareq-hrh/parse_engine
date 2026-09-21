@@ -130,9 +130,11 @@ export function schemaToSchemaFields(schema: Record<string, unknown> | null): Sc
 export function validateSchemaFields(fields: SchemaField[]): string | null {
   const seenFieldNames = new Set<string>();
 
-  for (const field of fields) {
+  for (const [fieldIndex, field] of fields.entries()) {
     const name = field.name.trim();
-    if (!name) continue;
+    if (!name) {
+      return `Field ${fieldIndex + 1} needs a name. Remove the row if you do not want to include it.`;
+    }
 
     if (seenFieldNames.has(name)) {
       return `Duplicate field name: "${name}". Each field name must be unique.`;
@@ -140,14 +142,17 @@ export function validateSchemaFields(fields: SchemaField[]): string | null {
     seenFieldNames.add(name);
 
     if (field.type === "object[]") {
-      const validSubFields = field.subFields.filter((s) => s.name.trim() !== "");
-      if (validSubFields.length === 0) {
+      if (field.subFields.length === 0) {
         return `Field "${name}" uses type object[] but has no sub-fields. Add at least one sub-field or choose another type.`;
       }
 
       const seenSubNames = new Set<string>();
-      for (const sub of validSubFields) {
+      for (const [subIndex, sub] of field.subFields.entries()) {
         const subName = sub.name.trim();
+        if (!subName) {
+          return `Sub-field ${subIndex + 1} inside field "${name}" needs a name. Remove the row if you do not want to include it.`;
+        }
+
         if (seenSubNames.has(subName)) {
           return `Duplicate sub-field name "${subName}" inside field "${name}". Each sub-field name must be unique.`;
         }

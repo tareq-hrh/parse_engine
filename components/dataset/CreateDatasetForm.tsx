@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Plus, X } from "lucide-react";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "react-toastify";
+
 import { Button } from "@/components/shadcn_ui/button";
 import { Input } from "@/components/shadcn_ui/input";
 import { Label } from "@/components/shadcn_ui/label";
-import { Textarea } from "@/components/shadcn_ui/textarea";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
-import { Plus, Loader2, X } from "lucide-react";
+import { Textarea } from "@/components/shadcn_ui/textarea";
 import { generateDatasetSlug } from "@/lib/datasetSlug";
+import { datasetFormSchema, type DatasetFormValues } from "./datasetFormSchema";
 import { Dataset } from "./types";
 import {
   getDatasetMutationErrorMessage,
@@ -22,22 +25,29 @@ export function CreateDatasetForm({
   onCreated: (dataset: Dataset) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const createDatasetMutation = useCreateDatasetMutation();
   const loading = createDatasetMutation.isPending;
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<DatasetFormValues>({
+    resolver: zodResolver(datasetFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+    },
+  });
+
+  const name = useWatch({ control, name: "name" });
   const slugPreview = generateDatasetSlug(name);
 
-  async function handleCreate() {
-    if (!name.trim()) {
-      toast.error("Dataset name is required.");
-      return;
-    }
-
+  async function handleCreate(values: DatasetFormValues) {
     try {
       const data = await createDatasetMutation.mutateAsync({
-        name: name.trim(),
-        description: description.trim() || undefined,
+        name: values.name,
+        description: values.description || undefined,
       });
 
       toast.success("Dataset created successfully.");
@@ -48,12 +58,16 @@ export function CreateDatasetForm({
   }
 
   return (
-    <>
-      {/* Header */}
+    <form
+      id="create-dataset-form"
+      onSubmit={handleSubmit(handleCreate)}
+      className="flex min-h-0 flex-1 flex-col"
+    >
       <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-surface-panel-header p-5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-mono text-base font-semibold text-foreground">New Dataset</h2>
         <div className="flex gap-2 sm:justify-end">
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={onCancel}
@@ -63,8 +77,8 @@ export function CreateDatasetForm({
             Cancel
           </Button>
           <Button
+            type="submit"
             size="sm"
-            onClick={handleCreate}
             disabled={loading}
             className="flex-1 font-mono text-xs gap-1.5 bg-blue-600 hover:bg-blue-500 text-white sm:flex-none"
           >
@@ -74,30 +88,31 @@ export function CreateDatasetForm({
         </div>
       </div>
 
-      {/* Form */}
       <ScrollArea className="flex-1">
         <div className="p-5 space-y-5">
-          {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="dataset-name" className="font-mono text-xs uppercase tracking-wider">
               Name <span className="text-destructive">*</span>
             </Label>
             <Input
               id="dataset-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              {...register("name")}
               placeholder="e.g. Invoices 2025"
+              aria-invalid={errors.name ? "true" : undefined}
               className="font-mono text-sm"
             />
-            {name.trim() && (
-              <p className="font-mono text-[11px] text-muted-foreground">
-                Slug will be:{" "}
-                <span className="text-foreground">{slugPreview || "invalid-name"}</span>
-              </p>
+            {errors.name ? (
+              <p className="font-mono text-xs text-destructive">{errors.name.message}</p>
+            ) : (
+              name.trim() && (
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  Slug will be:{" "}
+                  <span className="text-foreground">{slugPreview || "invalid-name"}</span>
+                </p>
+              )
             )}
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
             <Label
               htmlFor="dataset-description"
@@ -108,15 +123,13 @@ export function CreateDatasetForm({
             </Label>
             <Textarea
               id="dataset-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              {...register("description")}
               placeholder="e.g. Invoices from 2025"
               className="font-mono text-xs h-24"
             />
           </div>
-
         </div>
       </ScrollArea>
-    </>
+    </form>
   );
 }

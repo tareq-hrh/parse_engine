@@ -509,24 +509,12 @@ export function CreateExtractionJobForm({
                   ]}
                   renderSelected={(model) => (
                     <span className="flex min-w-0 items-center gap-2">
-                      <Brain
-                        className={cn(
-                          "size-3.5 shrink-0",
-                          model.supportsThinking ? "text-violet-400" : "text-muted-foreground",
-                        )}
-                      />
                       <span className="truncate text-foreground">{model.name}</span>
                       <ThinkingBadge model={model} />
                     </span>
                   )}
                   renderItem={(model) => (
                     <div className="flex min-w-0 items-center gap-2">
-                      <Brain
-                        className={cn(
-                          "size-3.5 shrink-0",
-                          model.supportsThinking ? "text-violet-400" : "text-muted-foreground",
-                        )}
-                      />
                       <span className="min-w-0 flex-1 truncate font-mono text-sm text-foreground">
                         {model.name}
                       </span>

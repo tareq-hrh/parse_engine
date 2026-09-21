@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Separator } from "@/components/shadcn_ui/separator";
 import { Button } from "@/components/shadcn_ui/button";
@@ -35,6 +35,8 @@ import {
   RotateCcw,
   Trash2,
   MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { schemaToSimplePreview } from "@/components/instruction/SchemaBuilder";
 import { ExtractionJob, ExtractionResult } from "./types";
@@ -48,6 +50,71 @@ import { computeFacets, matchesFilters, FilterState } from "./filterUtils";
 
 function truncateValue(str: string, max = 70): string {
   return str.length > max ? str.slice(0, max) + "…" : str;
+}
+
+const RESULT_PAGE_SIZE = 10;
+
+function getTotalPages(totalItems: number, pageSize: number): number {
+  return Math.max(1, Math.ceil(totalItems / pageSize));
+}
+
+function getPageSlice<T>(items: T[], page: number, pageSize: number): T[] {
+  const totalPages = getTotalPages(items.length, pageSize);
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  return items.slice(startIndex, startIndex + pageSize);
+}
+
+function ResultPaginationControls({
+  page,
+  totalItems,
+  pageSize,
+  itemLabel,
+  onPageChange,
+}: {
+  page: number;
+  totalItems: number;
+  pageSize: number;
+  itemLabel: string;
+  onPageChange: (page: number) => void;
+}) {
+  const totalPages = getTotalPages(totalItems, pageSize);
+  if (totalItems <= pageSize) return null;
+
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const pluralLabel = totalItems === 1 ? itemLabel : `${itemLabel}s`;
+
+  return (
+    <div className="flex items-center gap-2 pt-2">
+      <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(safePage - 1)}
+          className="size-9 p-0"
+          aria-label={`Go to previous ${itemLabel} page`}
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={safePage >= totalPages}
+          onClick={() => onPageChange(safePage + 1)}
+          className="size-9 p-0"
+          aria-label={`Go to next ${itemLabel} page`}
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      <span className="font-mono text-[11px] text-muted-foreground">
+        {totalItems} {pluralLabel} · page {safePage} of {totalPages}
+      </span>
+    </div>
+  );
 }
 
 export function ExtractionJobDetails({
@@ -88,6 +155,11 @@ export function ExtractionJobDetails({
   const [activeFilters, setActiveFilters] = useState<FilterState>({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resultPages, setResultPages] = useState({
+    jobId: job.id,
+    successful: 1,
+    failed: 1,
+  });
 
   const instructionTitle = job.instruction.title;
   const datasetName = job.dataset.name;
@@ -118,7 +190,52 @@ export function ExtractionJobDetails({
     return successfulResults.filter((result) => matchesFilters(result, activeFilters));
   }, [successfulResults, activeFilters, activeFilterCount]);
 
+  const successfulResultsTotalPages = getTotalPages(
+    filteredSuccessfulResults.length,
+    RESULT_PAGE_SIZE,
+  );
+  const failedResultsTotalPages = getTotalPages(failedResults.length, RESULT_PAGE_SIZE);
+  const currentResultPages =
+    resultPages.jobId === job.id
+      ? resultPages
+      : {
+          jobId: job.id,
+          successful: 1,
+          failed: 1,
+        };
+  const successfulResultsPage = Math.min(
+    currentResultPages.successful,
+    successfulResultsTotalPages,
+  );
+  const failedResultsPage = Math.min(currentResultPages.failed, failedResultsTotalPages);
+
+  const paginatedSuccessfulResults = useMemo(
+    () => getPageSlice(filteredSuccessfulResults, successfulResultsPage, RESULT_PAGE_SIZE),
+    [filteredSuccessfulResults, successfulResultsPage],
+  );
+  const paginatedFailedResults = useMemo(
+    () => getPageSlice(failedResults, failedResultsPage, RESULT_PAGE_SIZE),
+    [failedResults, failedResultsPage],
+  );
+
+  function setSuccessfulResultsPage(page: number) {
+    setResultPages((current) => ({
+      jobId: job.id,
+      successful: page,
+      failed: current.jobId === job.id ? current.failed : 1,
+    }));
+  }
+
+  function setFailedResultsPage(page: number) {
+    setResultPages((current) => ({
+      jobId: job.id,
+      successful: current.jobId === job.id ? current.successful : 1,
+      failed: page,
+    }));
+  }
+
   function handleToggleValue(key: string, value: string) {
+    setSuccessfulResultsPage(1);
     setActiveFilters((prev) => {
       const current = prev[key] ?? [];
       const next = current.includes(value)
@@ -129,6 +246,7 @@ export function ExtractionJobDetails({
   }
 
   function handleClearAll() {
+    setSuccessfulResultsPage(1);
     setActiveFilters({});
   }
 
@@ -437,12 +555,12 @@ export function ExtractionJobDetails({
             ) : (
               <>
                 {/* ── Filter controls row ─────────────────────────────── */}
-                <div className="flex items-center justify-between mb-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
                     {activeFilterCount > 0 && (
                       <>
                         <span>
-                          Showing {filteredSuccessfulResults.length} of {successfulResults.length}
+                          {filteredSuccessfulResults.length} of {successfulResults.length} match
                         </span>
                         <span className="text-muted-foreground/40">·</span>
                         <button
@@ -454,7 +572,7 @@ export function ExtractionJobDetails({
                       </>
                     )}
                   </div>
-                  <div className="flex items-end gap-1.5 pr-3">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
                     <Button
                       size="sm"
                       variant="outline"
@@ -514,9 +632,9 @@ export function ExtractionJobDetails({
                     No results match the current filters.
                   </p>
                 ) : (
-                  <ScrollArea type="auto" className="h-500 pr-3">
+                  <div className="space-y-3">
                     <div className="space-y-4">
-                      {filteredSuccessfulResults.map((result) => (
+                      {paginatedSuccessfulResults.map((result) => (
                         <ExtractionResultCard
                           key={result.id}
                           result={result}
@@ -525,7 +643,14 @@ export function ExtractionJobDetails({
                         />
                       ))}
                     </div>
-                  </ScrollArea>
+                    <ResultPaginationControls
+                      page={successfulResultsPage}
+                      totalItems={filteredSuccessfulResults.length}
+                      pageSize={RESULT_PAGE_SIZE}
+                      itemLabel="result"
+                      onPageChange={setSuccessfulResultsPage}
+                    />
+                  </div>
                 )}
               </>
             )}
@@ -568,9 +693,9 @@ export function ExtractionJobDetails({
                   )}
                 </div>
               </div>
-              <ScrollArea type="auto" className="h-500 pr-3">
+              <div className="space-y-3">
                 <div className="space-y-4">
-                  {failedResults.map((result) => (
+                  {paginatedFailedResults.map((result) => (
                     <FailedResultCard
                       key={result.id}
                       result={result}
@@ -579,7 +704,14 @@ export function ExtractionJobDetails({
                     />
                   ))}
                 </div>
-              </ScrollArea>
+                <ResultPaginationControls
+                  page={failedResultsPage}
+                  totalItems={failedResults.length}
+                  pageSize={RESULT_PAGE_SIZE}
+                  itemLabel="failed result"
+                  onPageChange={setFailedResultsPage}
+                />
+              </div>
             </TabsContent>
           )}
 

@@ -71,6 +71,7 @@ For a detailed description of the domain model and runtime behavior, see [PROJEC
 | --------------------- | ----------------------------------------------------- |
 | Application framework | Next.js 16.2 (App Router)                             |
 | UI                    | React 19, TypeScript, Tailwind CSS 4, shadcn/Radix UI |
+| Client server state   | TanStack Query                                        |
 | Local LLM runtime     | Ollama                                                |
 | Database              | SQLite                                                |
 | ORM                   | Prisma 7                                              |

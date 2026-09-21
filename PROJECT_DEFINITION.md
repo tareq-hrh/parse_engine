@@ -55,6 +55,29 @@ flowchart TD
 | SQLite            | Persistent datasets, inputs, instructions, jobs, and results                        |
 | Ollama            | Model discovery and local/model-host inference                                      |
 
+### Client data flow
+
+The browser treats REST responses as durable snapshots and TanStack Query as the owner of server state.
+
+TanStack Query owns server-backed collections and snapshots, including:
+
+- extraction job lists;
+- selected extraction job results;
+- datasets;
+- dataset input pages;
+- instructions;
+- Ollama model options.
+
+Client components should read these values through query hooks and use explicit query states for loading, error, and empty UI. Empty arrays should represent "loaded with no records", not "still initializing".
+
+Mutations should update server state through API routes and then patch or invalidate the relevant query keys. Local React state should stay limited to UI-only concerns such as the active tab, selected job id, panel mode, dialogs, form fields, filters, card expansion, and EventSource lifecycle.
+
+SSE is a live cache patch layer, not a second source of truth. While a job is running, the stream patches the TanStack Query cache for the extraction job list and the selected result snapshot. Result events append new successful or failed result cards when the viewed job matches the event. When the stream ends, errors, or receives a final state, the client performs a REST snapshot refetch as a safety sync.
+
+Runtime fields keep stable product meanings:
+
+Large raw input content is intentionally loaded lazily by detail cards when needed. Dataset input list snapshots omit that content so normal list navigation stays lightweight.
+
 ---
 
 ## 4. Domain model

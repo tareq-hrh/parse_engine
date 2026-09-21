@@ -142,7 +142,9 @@ export function validateSchemaFields(fields: SchemaField[]): string | null {
     seenFieldNames.add(name);
 
     if (field.type === "object[]") {
-      if (field.subFields.length === 0) {
+      const namedSubFields = field.subFields.filter((sub) => sub.name.trim().length > 0);
+
+      if (namedSubFields.length === 0) {
         return `Field "${name}" uses type object[] but has no sub-fields. Add at least one sub-field or choose another type.`;
       }
 

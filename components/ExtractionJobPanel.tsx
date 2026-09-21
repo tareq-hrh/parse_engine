@@ -19,7 +19,7 @@ import {
 // ── Right Panel: Empty State ──────────────────────────────────────────────────
 function EmptyState() {
   return (
-    <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm font-mono">
+    <div className="flex-1 flex pt-15 justify-center text-muted-foreground text-sm font-mono">
       ← Select an extraction job to view details
     </div>
   );

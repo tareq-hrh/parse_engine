@@ -23,25 +23,6 @@ export const metadata: Metadata = {
   description: "Local-first batch structured data extraction with Ollama.",
 };
 
-const themeInitScript = `
-(() => {
-  try {
-    const storedTheme = window.localStorage?.getItem("theme");
-    const theme =
-      storedTheme === "dark" || storedTheme === "light"
-        ? storedTheme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.style.colorScheme = theme;
-  } catch {
-    document.documentElement.style.colorScheme = "light";
-  }
-})();
-`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -50,12 +31,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      suppressHydrationWarning
       className={`${roboto.variable} ${robotoMono.variable} h-full antialiased`}
     >
-      <head>
-        <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <AppProviders>
           <ThemeProvider>

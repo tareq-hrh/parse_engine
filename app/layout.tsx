@@ -1,8 +1,8 @@
-import { ToastContainer } from "react-toastify";
 import type { Metadata } from "next";
 import { Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/app/providers";
+import { AppToastContainer } from "@/components/AppToastContainer";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -36,7 +36,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <AppProviders>
           <ThemeProvider>
-            <ToastContainer position="bottom-right" theme="light" />
+            <AppToastContainer />
             {children}
             <ThemeToggle />
           </ThemeProvider>

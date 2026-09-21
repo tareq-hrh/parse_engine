@@ -14,6 +14,11 @@ export function ExtractionJobCard({
 }) {
   const instructionTitle = job.instruction.title;
   const status = getJobStatus(job);
+  const createdAt = new Date(job.createdAt).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
   const total = job.totalInputCount;
   const successPercent =
     total > 0 ? Math.min(100, Math.round((job.successfulResultCount / total) * 100)) : 0;
@@ -57,6 +62,9 @@ export function ExtractionJobCard({
           </div>
           <div>
             Instruction: <span className="text-foreground">{instructionTitle}</span>
+          </div>
+          <div>
+            Created: <span className="text-foreground">{createdAt}</span>
           </div>
         </div>
       </div>

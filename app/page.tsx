@@ -479,7 +479,7 @@ export default function Home() {
       <header className="border-b border-border bg-surface-panel-header px-3 py-3 sm:px-6 sm:py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Logo className="size-7 fill-blue-500" />
+            <Logo className="h-7 w-auto" />
             <span className="font-mono text-sm font-semibold tracking-widest uppercase">
               Parse Engine
             </span>

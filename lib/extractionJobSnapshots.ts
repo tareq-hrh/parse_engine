@@ -1,4 +1,4 @@
-import type { ExtractionJob, ExtractionResult } from "@/components/extraction-job/types";
+import type { ExtractionJob, ExtractionResult } from "@/components/features/extraction-jobs/types";
 import { prisma, Prisma } from "@/lib/prisma";
 import { toModelOptions, toUsageMetrics } from "@/lib/prismaHelpers";
 

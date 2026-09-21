@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { InstructionPanel } from "@/components/InstructionPanel";
+import { InstructionPanel } from "@/components/features/instructions/InstructionPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn_ui/tabs";
-import { ExtractionJobPanel } from "@/components/ExtractionJobPanel";
-import { DatasetPanel } from "@/components/DatasetPanel";
-import { RunningBanner } from "@/components/RunningBanner";
+import { ExtractionJobPanel } from "@/components/features/extraction-jobs/ExtractionJobPanel";
+import { DatasetPanel } from "@/components/features/datasets/DatasetPanel";
+import { RunningBanner } from "@/components/app/RunningBanner";
 import { Cpu, FileText, Database, RefreshCcw, Wifi } from "lucide-react";
 import {
   Tooltip,
@@ -15,26 +15,26 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/shadcn_ui/tooltip";
-import { ExtractionJob, ExtractionResult, RightPanelMode } from "@/components/extraction-job/types";
+import { ExtractionJob, ExtractionResult, RightPanelMode } from "@/components/features/extraction-jobs/types";
 import {
   fetchExtractionJobs,
   useExtractionJobsQuery,
-} from "@/components/extraction-job/useExtractionJobs";
+} from "@/components/features/extraction-jobs/hooks/useExtractionJobs";
 import {
   fetchExtractionJobResults,
   type ExtractionJobResultsSnapshot,
   useExtractionJobResultsQuery,
-} from "@/components/extraction-job/useExtractionJobResults";
+} from "@/components/features/extraction-jobs/hooks/useExtractionJobResults";
 import {
   getMutationErrorMessage,
   useDeleteExtractionResultMutation,
   useStopExtractionJobMutation,
-} from "@/components/extraction-job/useExtractionJobMutations";
+} from "@/components/features/extraction-jobs/hooks/useExtractionJobMutations";
 import type { ExtractionJobEvent, ExtractionJobEventJobPatch } from "@/lib/extractionJobEvents";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/shadcn_ui/button";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import Logo from "@/components/Logo";
+import { ThemeToggle } from "@/components/app/ThemeToggle";
+import Logo from "@/components/app/Logo";
 
 function prependUniqueResult(
   results: ExtractionResult[],

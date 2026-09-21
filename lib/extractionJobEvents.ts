@@ -7,10 +7,10 @@
  */
 
 import { EventEmitter } from "events";
-import type { ExtractionJob, ExtractedData, UsageMetrics } from "@/components/extraction-job/types";
+import type { ExtractionJob, ExtractedData, UsageMetrics } from "@/components/features/extraction-jobs/types";
 
 // ── Payload for an extraction result sent over SSE ─────────────────────────
-// Matches ExtractionResult from components/extraction-job/types.ts so it can be
+// Matches ExtractionResult from components/features/extraction-jobs/types.ts so it can be
 // used directly as ExtractionResult in the frontend without any casting.
 export interface ExtractionResultEventPayload {
   id: string;

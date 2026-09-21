@@ -15,7 +15,7 @@ import { prisma, Prisma } from "./prisma";
 import { callOllamaModel, checkOllamaHealth } from "./ollamaClient";
 import { sanitizeExtractedData } from "./sanitizeExtractedData";
 import { emitExtractionJobEvent } from "./extractionJobEvents";
-import type { ExtractedData } from "@/components/extraction-job/types";
+import type { ExtractedData } from "@/components/features/extraction-jobs/types";
 import {
   claimExtractionJobRun,
   clearExtractionJobAbortController,

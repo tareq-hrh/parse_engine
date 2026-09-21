@@ -2,7 +2,7 @@
  * Shared helpers for translating flat Prisma columns into frontend-friendly value objects.
  */
 
-import type { ModelOptions, UsageMetrics } from "@/components/extraction-job/types";
+import type { ModelOptions, UsageMetrics } from "@/components/features/extraction-jobs/types";
 
 // ExtractionJob stores model options as flat columns:
 // temperature Float, numCtx Int?, think String?

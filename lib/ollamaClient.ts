@@ -16,7 +16,7 @@
 
 import { Ollama } from "ollama";
 import { fetch as undiciFetch, Agent } from "undici";
-import type { ModelOptions } from "@/components/extraction-job/types";
+import type { ModelOptions } from "@/components/features/extraction-jobs/types";
 import {
   DEFAULT_OLLAMA_CALL_TIMEOUT_MS,
   getOllamaBaseUrl,

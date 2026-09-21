@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getJobStatus } from "@/components/extraction-job/utils";
-import type { ExtractionJob } from "@/components/extraction-job/types";
+import { getJobStatus } from "@/components/features/extraction-jobs/utils";
+import type { ExtractionJob } from "@/components/features/extraction-jobs/types";
 
 function job(patch: Partial<ExtractionJob>): ExtractionJob {
   return {

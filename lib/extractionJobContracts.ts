@@ -1,4 +1,4 @@
-import type { ModelOptions } from "@/components/extraction-job/types";
+import type { ModelOptions } from "@/components/features/extraction-jobs/types";
 import {
   ApiValidationError,
   isPlainObject,

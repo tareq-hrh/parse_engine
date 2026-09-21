@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatTokenCount,
   formatUsageDuration,
-} from "@/components/extraction-job/usageMetricsUtils";
+} from "@/components/features/extraction-jobs/results/usageMetricsUtils";
 
 describe("usageMetricsUtils", () => {
   it("formats Ollama nanosecond durations for display", () => {

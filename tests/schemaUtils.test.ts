@@ -6,7 +6,7 @@ import {
   schemaToSimplePreview,
   validateSchemaFields,
   type SchemaField,
-} from "@/components/instruction/schemaUtils";
+} from "@/components/features/instructions/schema-builder/schemaUtils";
 
 function field(patch: Partial<SchemaField>): SchemaField {
   return {

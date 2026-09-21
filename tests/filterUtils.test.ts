@@ -3,8 +3,8 @@ import {
   computeFacets,
   matchesFilters,
   type FilterState,
-} from "@/components/extraction-job/filterUtils";
-import type { ExtractionResult, ExtractedData } from "@/components/extraction-job/types";
+} from "@/components/features/extraction-jobs/filters/filterUtils";
+import type { ExtractionResult, ExtractedData } from "@/components/features/extraction-jobs/types";
 
 function result(id: string, extractedData: ExtractedData | null): ExtractionResult {
   return {

@@ -4,7 +4,6 @@ import "./globals.css";
 import { AppProviders } from "@/app/providers";
 import { AppToastContainer } from "@/components/AppToastContainer";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 const roboto = Roboto({
   variable: "--font-sans",
@@ -38,7 +37,6 @@ export default function RootLayout({
           <ThemeProvider>
             <AppToastContainer />
             {children}
-            <ThemeToggle />
           </ThemeProvider>
         </AppProviders>
       </body>

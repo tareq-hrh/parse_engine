@@ -33,6 +33,7 @@ import {
 import type { ExtractionJobEvent, ExtractionJobEventJobPatch } from "@/lib/extractionJobEvents";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/shadcn_ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import Logo from "@/components/Logo";
 
 function prependUniqueResult(
@@ -471,53 +472,56 @@ export default function Home() {
               Parse Engine
             </span>
           </div>
+          <ThemeToggle />
         </div>
 
-        {ollamaOnline !== null && (
-          <div className="flex items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {ollamaOnline ? (
-                    <span className="flex items-center gap-1.5 font-mono text-[11px] text-green-400/80 cursor-default">
-                      <Wifi className="size-4" />
-                      Ollama running
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 font-mono text-[11px] text-red-400 cursor-help">
-                      <span className="size-4 rounded-full bg-red-400/20 border border-red-400/40 flex items-center justify-center text-[10px] font-bold leading-none">
-                        !
+        <div className="flex items-center gap-2">
+          {ollamaOnline !== null && (
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {ollamaOnline ? (
+                      <span className="flex items-center gap-1.5 font-mono text-[11px] text-green-400/80 cursor-default">
+                        <Wifi className="size-4" />
+                        Ollama running
                       </span>
-                      Ollama offline
-                    </span>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {ollamaOnline
-                    ? "Ollama is running"
-                    : "Ollama is unavailable. Make sure it is installed and running before starting an extraction job."}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    onClick={checkOllama}
-                    variant="ghost"
-                    size="icon"
-                    className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
-                    aria-label="Refresh Ollama status"
-                  >
-                    <RefreshCcw className="size-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Refresh Ollama status</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )}
+                    ) : (
+                      <span className="flex items-center gap-1.5 font-mono text-[11px] text-red-400 cursor-help">
+                        <span className="size-4 rounded-full bg-red-400/20 border border-red-400/40 flex items-center justify-center text-[10px] font-bold leading-none">
+                          !
+                        </span>
+                        Ollama offline
+                      </span>
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {ollamaOnline
+                      ? "Ollama is running"
+                      : "Ollama is unavailable. Make sure it is installed and running before starting an extraction job."}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      onClick={checkOllama}
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 text-muted-foreground hover:text-foreground cursor-pointer"
+                      aria-label="Refresh Ollama status"
+                    >
+                      <RefreshCcw className="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Refresh Ollama status</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
+          )}
+        </div>
       </header>
 
       {/* ── Running Banner — sticky, only visible when an extraction job is running ── */}

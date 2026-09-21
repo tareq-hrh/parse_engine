@@ -43,6 +43,11 @@ export interface DeleteExtractionJobResult {
   deletedResultCount: number;
 }
 
+export interface UpdateExtractionJobTitleInput {
+  jobId: string;
+  title: string;
+}
+
 export interface DeleteExtractionResultInput {
   jobId: string;
   resultId: string;
@@ -106,6 +111,17 @@ export function useDeleteExtractionJobMutation() {
     mutationFn: (jobId: string) =>
       fetchJson<DeleteExtractionJobResult>(`/api/extraction-jobs/${jobId}`, {
         method: "DELETE",
+      }),
+  });
+}
+
+export function useUpdateExtractionJobTitleMutation() {
+  return useMutation({
+    mutationFn: ({ jobId, title }: UpdateExtractionJobTitleInput) =>
+      fetchJson<ExtractionJob>(`/api/extraction-jobs/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
       }),
   });
 }

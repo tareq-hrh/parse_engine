@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
 import { Separator } from "@/components/shadcn_ui/separator";
 import { Button } from "@/components/shadcn_ui/button";
+import { Input } from "@/components/shadcn_ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn_ui/tabs";
 import {
   Dialog,
@@ -37,6 +38,8 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { schemaToSimplePreview } from "@/components/instruction/SchemaBuilder";
 import { ExtractionJob, ExtractionResult } from "./types";
@@ -134,6 +137,8 @@ export function ExtractionJobDetails({
   deleteLoading,
   onDeleteJob,
   onDeleteResult,
+  titleUpdateLoading,
+  onUpdateTitle,
 }: {
   job: ExtractionJob;
   successfulResults: ExtractionResult[];
@@ -151,10 +156,14 @@ export function ExtractionJobDetails({
   deleteLoading: boolean;
   onDeleteJob: () => Promise<boolean>;
   onDeleteResult: (resultId: string) => Promise<boolean>;
+  titleUpdateLoading: boolean;
+  onUpdateTitle: (title: string) => Promise<boolean>;
 }) {
   const [activeFilters, setActiveFilters] = useState<FilterState>({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(job.title);
   const [resultPages, setResultPages] = useState({
     jobId: job.id,
     successful: 1,
@@ -163,6 +172,9 @@ export function ExtractionJobDetails({
 
   const instructionTitle = job.instruction.title;
   const datasetName = job.dataset.name;
+  const trimmedTitleDraft = titleDraft.trim();
+  const titleSaveDisabled =
+    titleUpdateLoading || trimmedTitleDraft.length === 0 || trimmedTitleDraft === job.title;
   const selectedJobIsRunning = runningJobId ? runningJobId === job.id : job.isRunning;
   const anotherJobIsRunning = runningJobId !== null && runningJobId !== job.id;
   const hasAnyRunningJob = selectedJobIsRunning || anotherJobIsRunning;
@@ -250,6 +262,45 @@ export function ExtractionJobDetails({
     setActiveFilters({});
   }
 
+  function handleStartTitleEdit() {
+    setTitleDraft(job.title);
+    setTitleEditing(true);
+  }
+
+  function handleCancelTitleEdit() {
+    if (titleUpdateLoading) return;
+    setTitleDraft(job.title);
+    setTitleEditing(false);
+  }
+
+  async function handleSaveTitle() {
+    if (titleSaveDisabled) {
+      if (trimmedTitleDraft === job.title) {
+        setTitleEditing(false);
+      }
+      return;
+    }
+
+    const updated = await onUpdateTitle(trimmedTitleDraft);
+    if (updated) {
+      setTitleDraft(trimmedTitleDraft);
+      setTitleEditing(false);
+    }
+  }
+
+  function handleTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handleSaveTitle();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleCancelTitleEdit();
+    }
+  }
+
   function handleDownloadJSON() {
     const rows = successfulResults.map((result) => ({
       inputLabel: result.inputLabel,
@@ -277,52 +328,113 @@ export function ExtractionJobDetails({
     <ScrollArea className="flex-1">
       <div className="px-3 py-5 space-y-5">
         {/* ── Header row ──────────────────────────────────────────────── */}
-        <div>
-          {(selectedJobIsRunning || status === "pending" || anotherJobIsRunning) && (
-            <div className="flex flex-col items-start gap-1 mb-2">
-              {selectedJobIsRunning ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onStop}
-                  disabled={stopping}
-                  className="cursor-pointer group uppercase rounded-sm font-mono text-xs gap-1.5 border-red-400 text-red-400 bg-transparent hover:bg-red-400/10 hover:text-red-700 hover:border-red-700 disabled:opacity-40 shrink-0"
-                >
-                  {stopping ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Square className="size-4 fill-red-400 group-hover:fill-red-700" />
-                  )}
-                  {stopping ? "Stopping..." : "Stop"}
-                </Button>
-              ) : status === "pending" ? (
-                <Button
-                  size="sm"
-                  onClick={onStart}
-                  disabled={actionLoading || retryFailedLoading || stopping || hasAnyRunningJob}
-                  className="cursor-pointer rounded-sm uppercase font-mono text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 shrink-0"
-                >
-                  {actionLoading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Play className="size-4 fill-white" />
-                  )}
-                  {actionLoading ? "Starting..." : "Start"}
-                </Button>
-              ) : null}
-              {anotherJobIsRunning && (
-                <span className="font-mono py-1.5 text-[10px] text-muted-foreground">
-                  Another job is running
-                </span>
-              )}
-            </div>
-          )}
+        <div >
+          <div className="flex flex-wrap items-center gap-2 justify-between mb-2">
+            {(selectedJobIsRunning || status === "pending" || anotherJobIsRunning) && (
+              <div className="flex flex-col items-start gap-1">
+                {selectedJobIsRunning ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onStop}
+                    disabled={stopping}
+                    className="cursor-pointer group uppercase rounded-sm font-mono text-xs gap-1.5 border-red-400 text-red-400 bg-transparent hover:bg-red-400/10 hover:text-red-700 hover:border-red-700 disabled:opacity-40 shrink-0"
+                  >
+                    {stopping ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Square className="size-4 fill-red-400 group-hover:fill-red-700" />
+                    )}
+                    {stopping ? "Stopping..." : "Stop"}
+                  </Button>
+                ) : status === "pending" ? (
+                  <Button
+                    size="sm"
+                    onClick={onStart}
+                    disabled={actionLoading || retryFailedLoading || stopping || hasAnyRunningJob}
+                    className="cursor-pointer rounded-sm uppercase font-mono text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 shrink-0"
+                  >
+                    {actionLoading ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Play className="size-4 fill-white" />
+                    )}
+                    {actionLoading ? "Starting..." : "Start"}
+                  </Button>
+                ) : null}
+                {anotherJobIsRunning && (
+                  <span className="font-mono py-1.5 text-[10px] text-muted-foreground">
+                    Another job is running
+                  </span>
+                )}
+              </div>
+            )}
+            <StatusBadge status={status} />
+          </div>
+
           <div className="flex gap-2 items-start justify-between">
             {/* ── Left: extraction job info ─────────────────────────────────────────── */}
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h2 className="font-mono text-base font-semibold text-foreground">{job.title}</h2>
-                <StatusBadge status={status} />
+                {titleEditing ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <Input
+                      value={titleDraft}
+                      onChange={(event) => setTitleDraft(event.target.value)}
+                      onKeyDown={handleTitleKeyDown}
+                      disabled={titleUpdateLoading}
+                      autoFocus
+                      aria-label="Extraction job title"
+                      aria-invalid={trimmedTitleDraft.length === 0}
+                      className="h-8 min-w-48 max-w-lg rounded-sm font-mono text-base font-semibold"
+                    />
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="outline"
+                      onClick={() => {
+                        void handleSaveTitle();
+                      }}
+                      disabled={titleSaveDisabled}
+                      className="rounded-sm"
+                      aria-label="Save extraction job title"
+                    >
+                      {titleUpdateLoading ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Check className="size-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={handleCancelTitleEdit}
+                      disabled={titleUpdateLoading}
+                      className="rounded-sm text-muted-foreground hover:text-foreground"
+                      aria-label="Cancel title edit"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <h2 className="font-mono text-base font-semibold text-foreground">
+                      {job.title}
+                    </h2>
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={handleStartTitleEdit}
+                      disabled={titleUpdateLoading}
+                      className="rounded-sm text-muted-foreground hover:text-foreground"
+                      aria-label="Edit extraction job title"
+                    >
+                      <Pencil className="size-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground font-mono mb-1">
                 <span>
@@ -671,12 +783,7 @@ export function ExtractionJobDetails({
                     size="sm"
                     variant="outline"
                     onClick={onRetryFailed}
-                    disabled={
-                      retryFailedLoading ||
-                      actionLoading ||
-                      stopping ||
-                      hasAnyRunningJob
-                    }
+                    disabled={retryFailedLoading || actionLoading || stopping || hasAnyRunningJob}
                     className="rounded-sm font-mono text-xs gap-1.5 shrink-0 border-red-500/30 text-red-400 hover:text-red-300"
                   >
                     {retryFailedLoading ? (

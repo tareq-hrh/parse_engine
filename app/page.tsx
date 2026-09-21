@@ -369,6 +369,18 @@ export default function Home() {
   const handleClearedJobSelection = useCallback(() => {
     viewedJobIdRef.current = null;
   }, []);
+
+  const handleUpdatedExtractionJob = useCallback(
+    (updatedJob: ExtractionJob) => {
+      updateResultsSnapshot(updatedJob.id, (snapshot) => ({
+        ...snapshot,
+        successfulResultCount: updatedJob.successfulResultCount,
+        failedResultCount: updatedJob.failedResultCount,
+        job: updatedJob,
+      }));
+    },
+    [updateResultsSnapshot],
+  );
   // ── Reconnect SSE if a job is already running on page load ────────────────
   // Runs once when the initial extraction-jobs query completes.
   useEffect(() => {
@@ -586,6 +598,7 @@ export default function Home() {
               onDeletedJob={handleDeletedJob}
               onDeletedResult={handleDeletedResult}
               onClearedSelection={handleClearedJobSelection}
+              onUpdatedJob={handleUpdatedExtractionJob}
             />
           </TabsContent>
 

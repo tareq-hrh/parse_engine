@@ -14,6 +14,7 @@ import {
   useDeleteExtractionJobMutation,
   useRetryFailedResultsMutation,
   useStartExtractionJobMutation,
+  useUpdateExtractionJobTitleMutation,
 } from "./extraction-job/useExtractionJobMutations";
 
 // ── Right Panel: Empty State ──────────────────────────────────────────────────
@@ -51,6 +52,7 @@ interface ExtractionJobPanelProps {
   onDeletedJob: (id: string) => void;
   onDeletedResult: (jobId: string, resultId: string) => Promise<boolean>;
   onClearedSelection: () => void;
+  onUpdatedJob: (job: ExtractionJob) => void;
 }
 
 // ── Main ExtractionJobPanel ─────────────────────────────────────────────────────
@@ -77,14 +79,17 @@ export function ExtractionJobPanel({
   onDeletedJob,
   onDeletedResult,
   onClearedSelection,
+  onUpdatedJob,
 }: ExtractionJobPanelProps) {
   const startExtractionJobMutation = useStartExtractionJobMutation();
   const retryFailedResultsMutation = useRetryFailedResultsMutation();
   const deleteExtractionJobMutation = useDeleteExtractionJobMutation();
+  const updateExtractionJobTitleMutation = useUpdateExtractionJobTitleMutation();
 
   const actionLoading = startExtractionJobMutation.isPending;
   const retryFailedLoading = retryFailedResultsMutation.isPending;
   const deleteLoading = deleteExtractionJobMutation.isPending;
+  const titleUpdateLoading = updateExtractionJobTitleMutation.isPending;
 
   async function handleSelectJob(id: string) {
     onSelectedIdChange(id);
@@ -170,6 +175,25 @@ export function ExtractionJobPanel({
       return true;
     } catch (error) {
       toast.error(getMutationErrorMessage(error, "Failed to delete extraction job."));
+      return false;
+    }
+  }
+
+  async function handleUpdateTitle(title: string): Promise<boolean> {
+    if (!selectedId) return false;
+
+    try {
+      const updatedJob = await updateExtractionJobTitleMutation.mutateAsync({
+        jobId: selectedId,
+        title,
+      });
+
+      updateJobs((prev) => prev.map((job) => (job.id === updatedJob.id ? updatedJob : job)));
+      onUpdatedJob(updatedJob);
+      toast.success("Extraction job title updated.");
+      return true;
+    } catch (error) {
+      toast.error(getMutationErrorMessage(error, "Failed to update extraction job title."));
       return false;
     }
   }
@@ -267,6 +291,8 @@ export function ExtractionJobPanel({
               deleteLoading={deleteLoading}
               onDeleteJob={handleDeleteJob}
               onDeleteResult={(resultId) => onDeletedResult(selectedJob.id, resultId)}
+              titleUpdateLoading={titleUpdateLoading}
+              onUpdateTitle={handleUpdateTitle}
             />
           )}
 

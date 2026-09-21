@@ -29,11 +29,12 @@ function EmptyState() {
 interface ExtractionJobPanelProps {
   jobs: ExtractionJob[];
   updateJobs: (updater: (jobs: ExtractionJob[]) => ExtractionJob[]) => void;
-  hasRunningJob: boolean;
   jobsLoading: boolean;
   jobsError: boolean;
   onRetryJobs: () => void;
   selectedId: string | null;
+  runningJobId: string | null;
+  stopping: boolean;
   mode: RightPanelMode;
   onSelectedIdChange: (id: string | null) => void;
   onModeChange: (mode: RightPanelMode) => void;
@@ -46,6 +47,7 @@ interface ExtractionJobPanelProps {
   // Callbacks to parent
   onSelectJob: (id: string) => Promise<void>; // triggers snapshot fetch + viewedJobId tracking
   onStarted: (jobId: string, job?: ExtractionJob) => void; // triggers SSE stream open after successful start
+  onStop: () => void;
   onDeletedJob: (id: string) => void;
   onDeletedResult: (jobId: string, resultId: string) => Promise<boolean>;
   onClearedSelection: () => void;
@@ -55,11 +57,12 @@ interface ExtractionJobPanelProps {
 export function ExtractionJobPanel({
   jobs,
   updateJobs,
-  hasRunningJob,
   jobsLoading,
   jobsError,
   onRetryJobs,
   selectedId,
+  runningJobId,
+  stopping,
   mode,
   onSelectedIdChange,
   onModeChange,
@@ -70,6 +73,7 @@ export function ExtractionJobPanel({
   onRetryResults,
   onSelectJob,
   onStarted,
+  onStop,
   onDeletedJob,
   onDeletedResult,
   onClearedSelection,
@@ -253,9 +257,11 @@ export function ExtractionJobPanel({
               resultsLoading={resultsLoading}
               resultsError={resultsError}
               onRetryResults={onRetryResults}
-              hasRunningJob={hasRunningJob}
+              runningJobId={runningJobId}
               actionLoading={actionLoading}
               onStart={handleStart}
+              onStop={onStop}
+              stopping={stopping}
               retryFailedLoading={retryFailedLoading}
               onRetryFailed={handleRetryFailed}
               deleteLoading={deleteLoading}

@@ -430,6 +430,7 @@ export default function Home() {
 
   // ── Stop handler — owned here so banner and panel share the same action ───
   async function handleStop() {
+    if (stopping) return;
     const runningJob = jobs.find((job) => job.isRunning);
     if (!runningJob) return;
     setStopping(true);
@@ -458,7 +459,6 @@ export default function Home() {
   }
 
   const runningJob = jobs.find((job) => job.isRunning) ?? null;
-  const hasRunningJob = runningJob !== null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -558,13 +558,14 @@ export default function Home() {
             <ExtractionJobPanel
               jobs={jobs}
               updateJobs={updateJobs}
-              hasRunningJob={hasRunningJob}
               jobsLoading={jobsLoading}
               jobsError={jobsError}
               onRetryJobs={() => {
                 void extractionJobsQuery.refetch();
               }}
               selectedId={selectedExtractionJobId}
+              runningJobId={runningJob?.id ?? null}
+              stopping={stopping}
               mode={extractionJobPanelMode}
               onSelectedIdChange={setSelectedExtractionJobId}
               onModeChange={setExtractionJobPanelMode}
@@ -577,6 +578,7 @@ export default function Home() {
               }}
               onSelectJob={handleSelectJob}
               onStarted={handleStarted}
+              onStop={handleStop}
               onDeletedJob={handleDeletedJob}
               onDeletedResult={handleDeletedResult}
               onClearedSelection={handleClearedJobSelection}

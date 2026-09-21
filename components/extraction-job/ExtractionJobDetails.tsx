@@ -27,6 +27,7 @@ import {
   FileText,
   Play,
   Loader2,
+  Square,
   Cpu,
   SlidersHorizontal,
   X,
@@ -56,9 +57,11 @@ export function ExtractionJobDetails({
   resultsLoading,
   resultsError,
   onRetryResults,
-  hasRunningJob,
+  runningJobId,
   actionLoading,
   onStart,
+  onStop,
+  stopping,
   retryFailedLoading,
   onRetryFailed,
   deleteLoading,
@@ -71,9 +74,11 @@ export function ExtractionJobDetails({
   resultsLoading: boolean;
   resultsError: boolean;
   onRetryResults: () => void;
-  hasRunningJob: boolean;
+  runningJobId: string | null;
   actionLoading: boolean;
   onStart: () => void;
+  onStop: () => void;
+  stopping: boolean;
   retryFailedLoading: boolean;
   onRetryFailed: () => void;
   deleteLoading: boolean;
@@ -86,10 +91,15 @@ export function ExtractionJobDetails({
 
   const instructionTitle = job.instruction.title;
   const datasetName = job.dataset.name;
-  const status = getJobStatus(job);
+  const selectedJobIsRunning = runningJobId ? runningJobId === job.id : job.isRunning;
+  const anotherJobIsRunning = runningJobId !== null && runningJobId !== job.id;
+  const hasAnyRunningJob = selectedJobIsRunning || anotherJobIsRunning;
+  const status = getJobStatus({ ...job, isRunning: selectedJobIsRunning });
   const total = job.totalInputCount;
-  const deleteDisabled = deleteLoading || actionLoading || retryFailedLoading || hasRunningJob;
-  const resultDeleteDisabled = actionLoading || retryFailedLoading || deleteLoading || hasRunningJob;
+  const deleteDisabled =
+    deleteLoading || actionLoading || retryFailedLoading || stopping || hasAnyRunningJob;
+  const resultDeleteDisabled =
+    actionLoading || retryFailedLoading || deleteLoading || stopping || hasAnyRunningJob;
 
   const successPercent =
     total > 0 ? Math.min(100, Math.round((job.successfulResultCount / total) * 100)) : 0;
@@ -150,24 +160,40 @@ export function ExtractionJobDetails({
       <div className="px-3 py-5 space-y-5">
         {/* ── Header row ──────────────────────────────────────────────── */}
         <div>
-          {/* Start button — only for pending jobs */}
-          {status === "pending" && (
+          {(selectedJobIsRunning || status === "pending" || anotherJobIsRunning) && (
             <div className="flex flex-col items-start gap-1 mb-2">
-              <Button
-                size="sm"
-                onClick={onStart}
-                disabled={actionLoading || retryFailedLoading || hasRunningJob}
-                className="cursor-pointer rounded-sm uppercase font-mono text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 shrink-0"
-              >
-                {actionLoading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Play className="size-4 fill-white" />
-                )}
-                {actionLoading ? "Starting..." : "Start"}
-              </Button>
-              {hasRunningJob && !job.isRunning && (
-                <span className="font-mono text-[10px] text-muted-foreground">
+              {selectedJobIsRunning ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onStop}
+                  disabled={stopping}
+                  className="cursor-pointer group uppercase rounded-sm font-mono text-xs gap-1.5 border-red-400 text-red-400 bg-transparent hover:bg-red-400/10 hover:text-red-700 hover:border-red-700 disabled:opacity-40 shrink-0"
+                >
+                  {stopping ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Square className="size-4 fill-red-400 group-hover:fill-red-700" />
+                  )}
+                  {stopping ? "Stopping..." : "Stop"}
+                </Button>
+              ) : status === "pending" ? (
+                <Button
+                  size="sm"
+                  onClick={onStart}
+                  disabled={actionLoading || retryFailedLoading || stopping || hasAnyRunningJob}
+                  className="cursor-pointer rounded-sm uppercase font-mono text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 shrink-0"
+                >
+                  {actionLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Play className="size-4 fill-white" />
+                  )}
+                  {actionLoading ? "Starting..." : "Start"}
+                </Button>
+              ) : null}
+              {anotherJobIsRunning && (
+                <span className="font-mono py-1.5 text-[10px] text-muted-foreground">
                   Another job is running
                 </span>
               )}
@@ -394,7 +420,7 @@ export function ExtractionJobDetails({
                 </button>
               </div>
             ) : successfulResults.length === 0 ? (
-              job.isRunning ? (
+              selectedJobIsRunning ? (
                 <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground font-mono">
                   <Loader2 className="size-3.5 animate-spin" />
                   {hasAnyResults
@@ -520,7 +546,12 @@ export function ExtractionJobDetails({
                     size="sm"
                     variant="outline"
                     onClick={onRetryFailed}
-                    disabled={retryFailedLoading || actionLoading || job.isRunning || hasRunningJob}
+                    disabled={
+                      retryFailedLoading ||
+                      actionLoading ||
+                      stopping ||
+                      hasAnyRunningJob
+                    }
                     className="rounded-sm font-mono text-xs gap-1.5 shrink-0 border-red-500/30 text-red-400 hover:text-red-300"
                   >
                     {retryFailedLoading ? (
@@ -530,7 +561,7 @@ export function ExtractionJobDetails({
                     )}
                     {retryFailedLoading ? "Clearing..." : "Clear failed for retry"}
                   </Button>
-                  {hasRunningJob && !job.isRunning && (
+                  {anotherJobIsRunning && (
                     <span className="font-mono text-[10px] text-muted-foreground">
                       Another job is running
                     </span>

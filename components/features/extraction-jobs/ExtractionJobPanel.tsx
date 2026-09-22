@@ -3,7 +3,9 @@
 import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
+import { ListPaginationControls } from "@/components/workspace/ListPaginationControls";
 import { WorkspacePanelShell } from "@/components/workspace/WorkspacePanelShell";
+import { useClientListPagination } from "@/components/workspace/useClientListPagination";
 import { Plus, Loader2 } from "lucide-react";
 import { ExtractionJob, ExtractionResult, RightPanelMode } from "@/components/features/extraction-jobs/types";
 import { ExtractionJobCard } from "@/components/features/extraction-jobs/cards/ExtractionJobCard";
@@ -16,6 +18,8 @@ import {
   useStartExtractionJobMutation,
   useUpdateExtractionJobTitleMutation,
 } from "@/components/features/extraction-jobs/hooks/useExtractionJobMutations";
+
+const EXTRACTION_JOB_LIST_PAGE_SIZE = 10;
 
 // ── Right Panel: Empty State ──────────────────────────────────────────────────
 function EmptyState() {
@@ -111,6 +115,7 @@ export function ExtractionJobPanel({
   }
 
   async function handleCreated(newJob: ExtractionJob) {
+    setJobsPage(1);
     updateJobs((prev) => [newJob, ...prev]);
     onSelectedIdChange(newJob.id);
     onModeChange("view");
@@ -206,6 +211,16 @@ export function ExtractionJobPanel({
     if (!a.isRunning && b.isRunning) return 1;
     return 0;
   });
+  const {
+    page: jobsPage,
+    totalItems: jobTotalItems,
+    totalPages: jobTotalPages,
+    paginatedItems: paginatedJobs,
+    setPage: setJobsPage,
+  } = useClientListPagination({
+    items: sortedJobs,
+    pageSize: EXTRACTION_JOB_LIST_PAGE_SIZE,
+  });
 
   return (
     <WorkspacePanelShell
@@ -256,7 +271,7 @@ export function ExtractionJobPanel({
               )}
               {!jobsLoading &&
                 !jobsError &&
-                sortedJobs.map((job) => (
+                paginatedJobs.map((job) => (
                   <ExtractionJobCard
                     key={job.id}
                     job={job}
@@ -266,6 +281,15 @@ export function ExtractionJobPanel({
                 ))}
             </div>
           </ScrollArea>
+          {!jobsLoading && !jobsError && (
+            <ListPaginationControls
+              page={jobsPage}
+              totalItems={jobTotalItems}
+              totalPages={jobTotalPages}
+              itemLabel="extraction job"
+              onPageChange={setJobsPage}
+            />
+          )}
         </>
       }
       detail={

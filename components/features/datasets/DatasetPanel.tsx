@@ -5,7 +5,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
+import { ListPaginationControls } from "@/components/workspace/ListPaginationControls";
 import { WorkspacePanelShell } from "@/components/workspace/WorkspacePanelShell";
+import { useClientListPagination } from "@/components/workspace/useClientListPagination";
 import { Plus, Loader2, RefreshCcw } from "lucide-react";
 import { queryKeys } from "@/lib/queryKeys";
 import { Dataset, RightPanelMode } from "@/components/features/datasets/types";
@@ -20,6 +22,7 @@ import {
 } from "@/components/features/datasets/hooks/useDatasetMutations";
 
 const EMPTY_DATASETS: Dataset[] = [];
+const DATASET_LIST_PAGE_SIZE = 10;
 
 function EmptyState() {
   return (
@@ -74,6 +77,7 @@ export function DatasetPanel() {
   }
 
   function handleCreated(newDataset: Dataset) {
+    setDatasetsPage(1);
     updateDatasets((prev) => [
       newDataset,
       ...prev.filter((dataset) => dataset.id !== newDataset.id),
@@ -118,6 +122,16 @@ export function DatasetPanel() {
   }
 
   const selectedDataset = datasets.find((dataset) => dataset.id === selectedId) ?? null;
+  const {
+    page: datasetsPage,
+    totalItems: datasetTotalItems,
+    totalPages: datasetTotalPages,
+    paginatedItems: paginatedDatasets,
+    setPage: setDatasetsPage,
+  } = useClientListPagination({
+    items: datasets,
+    pageSize: DATASET_LIST_PAGE_SIZE,
+  });
 
   return (
     <WorkspacePanelShell
@@ -175,7 +189,7 @@ export function DatasetPanel() {
               )}
               {!loading &&
                 !datasetsError &&
-                datasets.map((dataset) => (
+                paginatedDatasets.map((dataset) => (
                   <DatasetCard
                     key={dataset.id}
                     dataset={dataset}
@@ -185,6 +199,16 @@ export function DatasetPanel() {
                 ))}
             </div>
           </ScrollArea>
+          {!loading && !datasetsError && (
+            <ListPaginationControls
+              page={datasetsPage}
+              totalItems={datasetTotalItems}
+              totalPages={datasetTotalPages}
+              itemLabel="dataset"
+              isFetching={datasetsQuery.isFetching && !loading}
+              onPageChange={setDatasetsPage}
+            />
+          )}
         </>
       }
       detail={

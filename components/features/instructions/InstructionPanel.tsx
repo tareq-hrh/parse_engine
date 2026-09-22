@@ -5,7 +5,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { Button } from "@/components/shadcn_ui/button";
 import { ScrollArea } from "@/components/shadcn_ui/scroll-area";
+import { ListPaginationControls } from "@/components/workspace/ListPaginationControls";
 import { WorkspacePanelShell } from "@/components/workspace/WorkspacePanelShell";
+import { useClientListPagination } from "@/components/workspace/useClientListPagination";
 import { Plus, Loader2, RefreshCcw } from "lucide-react";
 import { queryKeys } from "@/lib/queryKeys";
 import { Instruction, RightPanelMode } from "@/components/features/instructions/types";
@@ -20,6 +22,7 @@ import {
 } from "@/components/features/instructions/hooks/useInstructionMutations";
 
 const EMPTY_INSTRUCTIONS: Instruction[] = [];
+const INSTRUCTION_LIST_PAGE_SIZE = 10;
 
 // ── Right Panel: Empty State ──────────────────────────────────────────────────
 function EmptyState() {
@@ -76,6 +79,7 @@ export function InstructionPanel() {
   }
 
   function handleCreated(newInstruction: Instruction) {
+    setInstructionsPage(1);
     updateInstructions((prev) => [
       newInstruction,
       ...prev.filter((instruction) => instruction.id !== newInstruction.id),
@@ -114,6 +118,16 @@ export function InstructionPanel() {
   }
 
   const selectedInstruction = instructions.find((instruction) => instruction.id === selectedId) ?? null;
+  const {
+    page: instructionsPage,
+    totalItems: instructionTotalItems,
+    totalPages: instructionTotalPages,
+    paginatedItems: paginatedInstructions,
+    setPage: setInstructionsPage,
+  } = useClientListPagination({
+    items: instructions,
+    pageSize: INSTRUCTION_LIST_PAGE_SIZE,
+  });
 
   return (
     <WorkspacePanelShell
@@ -171,7 +185,7 @@ export function InstructionPanel() {
               )}
               {!loading &&
                 !instructionsError &&
-                instructions.map((instruction) => (
+                paginatedInstructions.map((instruction) => (
                   <InstructionCard
                     key={instruction.id}
                     instruction={instruction}
@@ -181,6 +195,16 @@ export function InstructionPanel() {
                 ))}
             </div>
           </ScrollArea>
+          {!loading && !instructionsError && (
+            <ListPaginationControls
+              page={instructionsPage}
+              totalItems={instructionTotalItems}
+              totalPages={instructionTotalPages}
+              itemLabel="instruction"
+              isFetching={instructionsQuery.isFetching && !loading}
+              onPageChange={setInstructionsPage}
+            />
+          )}
         </>
       }
       detail={

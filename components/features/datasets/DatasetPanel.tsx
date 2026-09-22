@@ -154,7 +154,7 @@ export function DatasetPanel() {
             </span>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea>
             <div className="space-y-2">
               {loading && (
                 <div className="flex items-center justify-center py-8">

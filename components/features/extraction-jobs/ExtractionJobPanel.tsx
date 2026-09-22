@@ -7,7 +7,11 @@ import { ListPaginationControls } from "@/components/workspace/ListPaginationCon
 import { WorkspacePanelShell } from "@/components/workspace/WorkspacePanelShell";
 import { useClientListPagination } from "@/components/workspace/useClientListPagination";
 import { Plus, Loader2 } from "lucide-react";
-import { ExtractionJob, ExtractionResult, RightPanelMode } from "@/components/features/extraction-jobs/types";
+import {
+  ExtractionJob,
+  ExtractionResult,
+  RightPanelMode,
+} from "@/components/features/extraction-jobs/types";
 import { ExtractionJobCard } from "@/components/features/extraction-jobs/cards/ExtractionJobCard";
 import { ExtractionJobDetails } from "@/components/features/extraction-jobs/detail/ExtractionJobDetails";
 import { CreateExtractionJobForm } from "@/components/features/extraction-jobs/create/CreateExtractionJobForm";
@@ -243,7 +247,7 @@ export function ExtractionJobPanel({
             </span>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea>
             <div className="space-y-2">
               {jobsLoading && (
                 <div className="flex items-center justify-center py-8">

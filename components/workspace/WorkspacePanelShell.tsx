@@ -22,7 +22,7 @@ export function WorkspacePanelShell({
     <div className="grid h-full min-h-0 gap-3 md:grid-cols-[minmax(14rem,20%)_minmax(0,1fr)]">
       <div
         className={cn(
-          "min-h-0 flex-col gap-2 rounded-sm border border-border/80 bg-surface-rail p-2",
+          "h-fit flex-col gap-2 rounded-sm border border-border/80 bg-surface-rail p-2",
           showDetail ? "hidden md:flex" : "flex",
         )}
       >

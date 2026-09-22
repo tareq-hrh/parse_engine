@@ -19,7 +19,7 @@ export function WorkspacePanelShell({
   onBack: () => void;
 }) {
   return (
-    <div className="grid h-full min-h-0 gap-3 md:grid-cols-[minmax(14rem,20%)_minmax(0,1fr)]">
+    <div className="grid h-full min-h-0 gap-3 md:grid-cols-[minmax(15rem,22%)_minmax(0,1fr)]">
       <div
         className={cn(
           "h-fit flex-col gap-2 rounded-sm border border-border/80 bg-surface-rail p-2",

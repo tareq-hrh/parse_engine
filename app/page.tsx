@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn_ui
 import { ExtractionJobPanel } from "@/components/features/extraction-jobs/ExtractionJobPanel";
 import { DatasetPanel } from "@/components/features/datasets/DatasetPanel";
 import { RunningBanner } from "@/components/app/RunningBanner";
+import { GoToTopButton } from "@/components/app/GoToTopButton";
 import { Cpu, FileText, Database, RefreshCcw, Wifi } from "lucide-react";
 import {
   Tooltip,
@@ -613,6 +614,7 @@ export default function Home() {
           </TabsContent>
         </Tabs>
       </main>
+      <GoToTopButton />
     </div>
   );
 }
